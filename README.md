@@ -13,18 +13,17 @@ A space adventure.
 ### Controls:
 
 Move the ship:
-W - add thrust in ship's forward direction
-A - add thrust in ship's left direction
-S - add thrust in ship's backward direction
-D - add thrust in ship's right direciton
+W  add thrust in ship's forward direction
+A  add thrust in ship's left direction
+S  add thrust in ship's backward direction
+D  add thrust in ship's right direciton
 
+Q  add rotational thrust left
+E  add rotational thrust right
 
-Q - add rotational thrust left
-E - add rotational thrust right
+Z  Activate/Deactivate dampers (dampers will counter-act ship's forces making it easier to pilot, however, you may just want to coast.)
 
-Z - Activate/Deactivate dampers (dampers will counter-act ship's forces making it easier to pilot, however, you may just want to coast.)
-
-Scroll wheel - to zoom in and out on map 
+Scroll wheel  to zoom in and out on map 
 
 
 ## Short Term To-Dos:

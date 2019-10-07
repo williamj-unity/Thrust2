@@ -1,3 +1,4 @@
+
 # Thrust 2
 
 A space adventure. 
@@ -12,18 +13,18 @@ A space adventure.
 
 ### Controls:
 
-Move the ship:
-W  add thrust in ship's forward direction
-A  add thrust in ship's left direction
-S  add thrust in ship's backward direction
-D  add thrust in ship's right direciton
 
-Q  add rotational thrust left
-E  add rotational thrust right
+W = add thrust in ship's forward direction 
+A  = add thrust in ship's left direction
+S   = add thrust in ship's backward direction
+D  = add thrust in ship's right direction 
 
-Z  Activate/Deactivate dampers (dampers will counter-act ship's forces making it easier to pilot, however, you may just want to coast.)
+Q  = add rotational thrust left
+E  = add rotational thrust right
 
-Scroll wheel  to zoom in and out on map 
+Z  = Activate/Deactivate dampers (dampers will counter-act ship's forces making it easier to pilot, however, you may just want to coast.)
+
+Scroll wheel = zoom in and out on map 
 
 
 ## Short Term To-Dos:
@@ -34,7 +35,7 @@ Scroll wheel  to zoom in and out on map
 ## Bigger To-Dos:
 - orbital mechanics for planet and ship interactions
 - orbital mechanics for planet-planet, planet-moon, star-planet, intertactions???
--- maybe some way to "fake" this as the math and physics are overly complicated for capturing the feeling desired here
+	- maybe some way to "fake" this as the math and physics are overly complicated for capturing the feeling desired here
 - start planet-side 2D sidescrolling ship controls
 - start planet-side 2D sidescrolling character controls
 

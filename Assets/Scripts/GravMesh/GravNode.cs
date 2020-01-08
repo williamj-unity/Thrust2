@@ -2,103 +2,104 @@
 using System.Collections.Generic;
 using System.Numerics;
 using UnityEditor.MemoryProfiler;
+using Unity.Jobs;
+using Unity.Mathematics;
+using Unity.Burst;
+using static Unity.Mathematics.math;
 using UnityEngine;
 using Vector3 = UnityEngine.Vector3;
 
 public class GravNode
 {
-    public GravNodeCollider gravNodeColliderParent { get; private set; }
     public Transform lineRendererTransform { get; private set; }
 
     public bool m_Moveable;
 
     public Vector3 m_Position;
     public Vector3 m_PrevPosition;
+    public Vector3 m_Velocity;
+    public Vector3 m_TargetPosition;
+    public Vector3 m_StartPosition;
     private Vector3 m_Acceleration;
+    public GravNodeCollider gravNodeColliderParent { get; private set; }
 
-    private Vector3 m_TargetPosition;
 
-    private float rigidity = 1.0f;
-    public GravNode(Vector3 position, float spacing)
+    public int m_Connections;
+
+    protected float rigidity = 1.0f;
+    public GravNode(Vector3 position, float spacing, bool pinned = false)
     {
-        gravNodeColliderParent = new GameObject("GravNode").AddComponent<GravNodeCollider>();
+        lineRendererTransform = new GameObject("LineRendererTransform").transform;
+        lineRendererTransform.position = position;
+
+        m_Position = position;
+        m_PrevPosition = position;
+        m_TargetPosition = m_Position;
+        m_StartPosition = m_Position;
+        m_Moveable = !pinned;
+        m_Acceleration = Vector3.zero;
+
+        gravNodeColliderParent = new GameObject("GravNodeAnchor").AddComponent<GravNodeCollider>();
         gravNodeColliderParent.SetSpacing(spacing);
         gravNodeColliderParent.transform.position = position;
         gravNodeColliderParent.affectorCollisionEnter += AffectorCollisionEnter;
         gravNodeColliderParent.affectorCollisionExit += AffectorCollisionExit;
-
-        
-        lineRendererTransform = new GameObject("LineRendererTransform").transform;
-        lineRendererTransform.position = position;
-        lineRendererTransform.parent = gravNodeColliderParent.transform;
-
-        m_TargetPosition = position;
-        m_Position = position;
-        m_PrevPosition = position;
-        m_Moveable = true;
     }
-    
+
+    public void OffsetPos(Vector3 correctionVectorHalf)
+    {
+        if (m_Moveable && m_Connections > 0)
+        {
+            m_Position += (correctionVectorHalf / m_Connections);
+        }
+    }
     void AffectorCollisionEnter(float mass)
     {
-        // node no longer moveable (driven by affector)
-        Vector3 newPose = gravNodeColliderParent.transform.position;
-        newPose.z += mass;
-        m_TargetPosition = newPose;
-        rigidity = mass;
-        ResetAcceleration();
+        Vector3 newPose = m_Position;
+        newPose.z = mass;
+        SetTargetPosition(newPose);
     }
 
     void AffectorCollisionExit()
     {
-        // node is moveable
-        m_TargetPosition = gravNodeColliderParent.transform.position;
-        rigidity = 1.0f;
-        ResetAcceleration();
-    }
-    
-    void AddForce(Vector3 f)
-    {
-        m_Acceleration += f; //mass is always 1 for these particles.
+        SetTargetPosition(m_StartPosition);
     }
 
+    void SetTargetPosition(Vector3 position)
+    {
+        m_TargetPosition = position;
+    }
+
+    public void ApplyForce(Vector3 force)
+    {
+        if(m_Moveable)
+            m_Acceleration = force;
+    }
 
     void ResetAcceleration()
     {
         m_Acceleration = Vector3.zero;
     }
-    
-    public void OffsetPos(Vector3 correctionVectorHalf)
-    {
-        if (m_Moveable)
-        {
-            m_Position += correctionVectorHalf;
-        }
-    }
 
-    public void SetPosition(Vector3 position)
+    public virtual void Update(float damping, float timeStep)
     {
-        m_Position = position;
-        lineRendererTransform.position = position;
-        m_PrevPosition = position;
+        ApplyForce((m_TargetPosition - m_Position));
+
+        float timeStepSq = timeStep * timeStep;
+
+        m_Velocity = (m_Position - m_PrevPosition) * 0.99f;
+        Vector3 next = m_Position + (m_Velocity) + 0.5f * m_Acceleration * timeStep;
+        m_PrevPosition = m_Position;
+        m_Position = next;
+        lineRendererTransform.position = m_Position;
         ResetAcceleration();
     }
-    
-    public void Update(float damping, float timeStep)
+
+    public struct UpdateJob : IJobParallelFor
     {
-        if(m_Moveable)
+        public void Execute(int index)
         {
-            AddForce((m_TargetPosition - lineRendererTransform.transform.position));
-            Vector3 temp = m_Position;
-            m_Position = m_Position + (m_Position - m_PrevPosition) * (1.0f - damping)  + m_Acceleration*timeStep;;
-            m_PrevPosition = temp;
-            var lineRenderPos = lineRendererTransform.position;
-            lineRenderPos.z = m_Position.z;
-            if (lineRenderPos.z <= 0)
-            {
-                lineRenderPos.z = 0;
-            }
-            lineRendererTransform.position = lineRenderPos;
-            ResetAcceleration();
+            throw new System.NotImplementedException();
         }
     }
 }

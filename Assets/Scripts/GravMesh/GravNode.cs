@@ -8,6 +8,7 @@ using Unity.Burst;
 using static Unity.Mathematics.math;
 using UnityEngine;
 using Vector3 = UnityEngine.Vector3;
+using Unity.Collections;
 
 public class GravNode
 {
@@ -15,30 +16,28 @@ public class GravNode
 
     public bool m_Moveable;
 
-    public Vector3 m_Position;
-    public Vector3 m_PrevPosition;
-    public Vector3 m_Velocity;
-    public Vector3 m_TargetPosition;
-    public Vector3 m_StartPosition;
-    private Vector3 m_Acceleration;
+    public float3 m_Position;
+    public float3 m_PrevPosition;
+    public float3 m_TargetPosition;
+    public float3 m_StartPosition;
+    public float3 m_Acceleration;
     public GravNodeCollider gravNodeColliderParent { get; private set; }
 
-
     public int m_Connections;
+    public int m_Index;
 
     protected float rigidity = 1.0f;
-    public GravNode(Vector3 position, float spacing, bool pinned = false)
+    public GravNode(float3 position, float spacing, int index)
     {
         lineRendererTransform = new GameObject("LineRendererTransform").transform;
         lineRendererTransform.position = position;
-
         m_Position = position;
         m_PrevPosition = position;
         m_TargetPosition = m_Position;
         m_StartPosition = m_Position;
-        m_Moveable = !pinned;
-        m_Acceleration = Vector3.zero;
-
+        m_Acceleration = float3(0,0,0);
+        m_Index = index;
+        m_Moveable = true;
         gravNodeColliderParent = new GameObject("GravNodeAnchor").AddComponent<GravNodeCollider>();
         gravNodeColliderParent.SetSpacing(spacing);
         gravNodeColliderParent.transform.position = position;
@@ -46,7 +45,7 @@ public class GravNode
         gravNodeColliderParent.affectorCollisionExit += AffectorCollisionExit;
     }
 
-    public void OffsetPos(Vector3 correctionVectorHalf)
+    public void OffsetPos(float3 correctionVectorHalf)
     {
         if (m_Moveable && m_Connections > 0)
         {
@@ -65,41 +64,67 @@ public class GravNode
         SetTargetPosition(m_StartPosition);
     }
 
-    void SetTargetPosition(Vector3 position)
+    void SetTargetPosition(float3 position)
     {
         m_TargetPosition = position;
     }
 
-    public void ApplyForce(Vector3 force)
+    public void SetPosition(float3 position)
     {
         if(m_Moveable)
-            m_Acceleration = force;
+        {
+            m_Position = position;
+        }
+    }
+
+    public void ApplyForce(float3 force)
+    {
+        if(m_Moveable)
+            m_Acceleration += force;
     }
 
     void ResetAcceleration()
     {
-        m_Acceleration = Vector3.zero;
+        m_Acceleration = float3(0, 0, 0);
     }
 
-    public virtual void Update(float damping, float timeStep)
+    public void UpdateTransforms(float3 prevPosition, float3 position)
     {
-        ApplyForce((m_TargetPosition - m_Position));
-
-        float timeStepSq = timeStep * timeStep;
-
-        m_Velocity = (m_Position - m_PrevPosition) * 0.99f;
-        Vector3 next = m_Position + (m_Velocity) + 0.5f * m_Acceleration * timeStep;
-        m_PrevPosition = m_Position;
-        m_Position = next;
+        m_Position = position;
+        m_PrevPosition = prevPosition;
         lineRendererTransform.position = m_Position;
         ResetAcceleration();
     }
 
+    [BurstCompile]
     public struct UpdateJob : IJobParallelFor
     {
+        [ReadOnly]
+        public float damping;
+        [ReadOnly]
+        public float timeStep;
+        [ReadOnly]
+        public NativeArray<float3> targetPositions;
+        [ReadOnly]
+        public NativeArray<float3> accelerations;
+        [ReadOnly]
+        public NativeArray<bool> moveable;
+
+        public NativeArray<float3> positions;
+        public NativeArray<float3> prevPositions;
+
         public void Execute(int index)
         {
-            throw new System.NotImplementedException();
+            float3 acceleration = 0;
+            if (moveable[index])
+                acceleration = accelerations[index] + (targetPositions[index] - positions[index]);
+
+            float timeStepSq = timeStep * timeStep;
+
+            float3 velocity = (positions[index] - prevPositions[index]) * 0.99f;
+            float3 next = positions[index] + (velocity) + damping * acceleration * timeStepSq;
+            prevPositions[index] = positions[index];
+            positions[index] = next;
         }
     }
 }

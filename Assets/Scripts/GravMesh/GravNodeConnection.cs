@@ -46,23 +46,25 @@ public struct SolveConstraintsJob : IJobParallelFor
 {
     [ReadOnly]
     public NativeArray<float> restDistances;
-
     [ReadOnly]
     public NativeArray<float> linkStiffness;
-
     [ReadOnly]
-    public NativeArray<float3> gn1Postions;
+    public NativeArray<float3> positions;
     [ReadOnly]
-    public NativeArray<float3> gn2Postions;
-
+    public NativeArray<int> gn1Indicies;
+    [ReadOnly]
+    public NativeArray<int> gn2Indicies;
     [WriteOnly]
     //half of the correction vector for the connection
     public NativeArray<float3> results;
 
     public void Execute(int index)
     {
-        float3 gn2Pos = gn2Postions[index];
-        float3 gn1Pos = gn1Postions[index];
+        //float3 gn2Pos = gn2Postions[index];
+        int index1 = gn1Indicies[index];
+        int index2 = gn2Indicies[index];
+        float3 gn1Pos = positions[index1];
+        float3 gn2Pos = positions[index2];
         float restDistance = restDistances[index];
 
         float3 gn1Togn2 = gn2Pos - gn1Pos;
@@ -79,3 +81,42 @@ public struct SolveConstraintsJob : IJobParallelFor
     }
 }
 
+[BurstCompile]
+public struct UpdateParticlePositions : IJobParallelFor
+{
+    [ReadOnly]
+    public NativeArray<float3> results;
+    [ReadOnly]
+    public NativeArray<int> position1Index;
+    [ReadOnly]
+    public NativeArray<int> position2Index;
+    [ReadOnly]
+    public NativeArray<int> connections;
+    [ReadOnly]
+    public NativeArray<bool> moveables;
+    [ReadOnly]
+    public NativeArray<float3> currentPositions;
+    [WriteOnly]
+    public NativeArray<float3> positions;
+
+    public void Execute(int index)
+    {
+        int gn1I = position1Index[index];
+        int gn2I = position2Index[index];
+        if (moveables[gn1I])
+        {
+            float3 pos1 = currentPositions[gn1I];
+            int con1 = connections[gn1I];
+            pos1 += results[index] / con1;
+            positions[gn1I] = pos1;
+        }
+
+        if (moveables[gn2I])
+        {
+            float3 pos2 = currentPositions[gn2I];
+            int con2 = connections[gn2I];
+            pos2 -= results[index] / con2;
+            positions[gn2I] = pos2;
+        }
+    }
+}

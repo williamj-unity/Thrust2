@@ -5195,12 +5195,10 @@ MonoBehaviour:
   dampingCoefficient: 0.9
   fixedDeltaTime: 16
   mHorizontalParticles: 50
-  mVerticalParticles: 30
+  mVerticalParticles: 50
   spacing: 0.2
   drawDiagonals: 0
-  drawAnchorConnections: 0
-  anchorStiffness: 1
-  planeLinkStiffness: 2
+  planeLinkStiffness: 0.6
 --- !u!4 &370391343
 Transform:
   m_ObjectHideFlags: 0
@@ -15211,7 +15209,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 43ad77824c8f1d746ba5aab9ea03a3ea, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mass: 0.1
+  mass: 40
 --- !u!1 &1170577037
 GameObject:
   m_ObjectHideFlags: 0

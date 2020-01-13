@@ -156,13 +156,11 @@ MonoBehaviour:
   SolverIterations: 3
   dampingCoefficient: 0.9
   fixedDeltaTime: 16
-  mHorizontalParticles: 50
-  mVerticalParticles: 30
+  mHorizontalParticles: 100
+  mVerticalParticles: 100
   spacing: 0.2
   drawDiagonals: 0
-  drawAnchorConnections: 0
-  anchorStiffness: 1.5
-  planeLinkStiffness: 0.4
+  planeLinkStiffness: 0.3
 --- !u!4 &370391343
 Transform:
   m_ObjectHideFlags: 0
@@ -171,7 +169,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 370391341}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8.05, y: -4.56, z: 0}
+  m_LocalPosition: {x: -9.26, y: -5.91, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -542,7 +540,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 43ad77824c8f1d746ba5aab9ea03a3ea, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mass: 4
+  mass: 5
 --- !u!114 &1215619601
 MonoBehaviour:
   m_ObjectHideFlags: 0

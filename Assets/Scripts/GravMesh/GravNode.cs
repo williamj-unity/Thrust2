@@ -9,13 +9,13 @@ using static Unity.Mathematics.math;
 using UnityEngine;
 using Vector3 = UnityEngine.Vector3;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 public class GravNode
 {
     public Transform lineRendererTransform { get; private set; }
 
     public bool m_Moveable;
-
     public float3 m_Position;
     public float3 m_PrevPosition;
     public float3 m_TargetPosition;
@@ -27,6 +27,15 @@ public class GravNode
     public int m_Index;
 
     protected float rigidity = 1.0f;
+    public NativeArray<int> neighborIndicies;
+    public NativeArray<float> restDistances;
+    public NativeArray<float> stiffnesses;
+
+    public List<int> neighborIndiciesList;
+    public List<float> restDistancesList;
+    public List<float> stiffnessesList;
+
+
     public GravNode(float3 position, float spacing, int index)
     {
         lineRendererTransform = new GameObject("LineRendererTransform").transform;
@@ -43,6 +52,24 @@ public class GravNode
         gravNodeColliderParent.transform.position = position;
         gravNodeColliderParent.affectorCollisionEnter += AffectorCollisionEnter;
         gravNodeColliderParent.affectorCollisionExit += AffectorCollisionExit;
+        neighborIndiciesList = new List<int>();
+        stiffnessesList = new List<float>();
+        restDistancesList = new List<float>();
+
+    }
+
+    public void ConvertNeighborListToNativeArray()
+    {
+        neighborIndicies = new NativeArray<int>(neighborIndiciesList.ToArray(), Allocator.Persistent);
+        restDistances = new NativeArray<float>(restDistancesList.ToArray(), Allocator.Persistent);
+        stiffnesses = new NativeArray<float>(stiffnessesList.ToArray(), Allocator.Persistent);
+    }
+
+    ~GravNode()
+    {
+        neighborIndicies.Dispose();
+        restDistances.Dispose();
+        stiffnesses.Dispose();
     }
 
     public void OffsetPos(float3 correctionVectorHalf)
@@ -83,7 +110,7 @@ public class GravNode
             m_Acceleration += force;
     }
 
-    void ResetAcceleration()
+    public void ResetAcceleration()
     {
         m_Acceleration = float3(0, 0, 0);
     }
@@ -93,7 +120,6 @@ public class GravNode
         m_Position = position;
         m_PrevPosition = prevPosition;
         lineRendererTransform.position = m_Position;
-        ResetAcceleration();
     }
 
     [BurstCompile]
@@ -125,6 +151,70 @@ public class GravNode
             float3 next = positions[index] + (velocity) + damping * acceleration * timeStepSq;
             prevPositions[index] = positions[index];
             positions[index] = next;
+        }
+    }
+
+    [BurstCompile]
+    public struct SolveContraints : IJobParallelFor
+    {
+        [ReadOnly]
+        public NativeArray<int> allneighbors;
+        [ReadOnly]
+        public NativeArray<int> numConnections;
+        [ReadOnly]
+        public NativeArray<int> startIndex;
+        [ReadOnly]
+        public NativeArray<float> allRestDistances;
+        [ReadOnly]
+        public float linkStiffness;
+        [ReadOnly]
+        public NativeArray<bool> moveable;
+        [ReadOnly]
+        public NativeArray<float3> positions;
+        [WriteOnly]
+        public NativeArray<float3> outPositions;
+
+        public void Execute(int index)
+        {
+            float3 gn1Pos = positions[index];
+            outPositions[index] = gn1Pos;
+            if (!moveable[index])
+                return;
+
+            float3 gn2Pos = 0;
+            float3 accumulator = gn1Pos;
+
+            int numConnection = numConnections[index];
+            for (int i = 0; i < numConnection; i++)
+            {
+                int start = startIndex[index];
+                
+                gn2Pos = positions[allneighbors[start + i]];
+                float restDistance = allRestDistances[start + i];
+
+                float3 gn1Togn2 = gn2Pos - gn1Pos;
+                float current_distance = math.distance(gn2Pos, gn1Pos);
+                float scalar = linkStiffness;
+
+                float3 correctionVector = (gn1Togn2 * (1.0f - restDistance / current_distance));
+
+                accumulator += (correctionVector * 0.5f * scalar) / numConnection;
+            }
+            outPositions[index] = accumulator;
+        }
+    }
+
+    [BurstCompile]
+    public struct SwapBuffers : IJobParallelFor
+    {
+        [WriteOnly]
+        public NativeArray<float3> positions;
+        [ReadOnly]
+        public NativeArray<float3> newPositions;
+
+        public void Execute(int index)
+        {
+            positions[index] = newPositions[index];
         }
     }
 }

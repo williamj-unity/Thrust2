@@ -25,7 +25,16 @@ public class Link
         gn1.m_Connections++;
         gn2.m_Connections++;
 
-        if(draw)
+        gn1.neighborIndiciesList.Add(gn2.m_Index);
+        gn2.neighborIndiciesList.Add(gn1.m_Index);
+
+        gn1.restDistancesList.Add(m_RestDistance);
+        gn2.restDistancesList.Add(m_RestDistance);
+
+        gn1.stiffnessesList.Add(stiffness);
+        gn2.stiffnessesList.Add(stiffness);
+
+        if (draw)
         {
             LineRenderPair lnp = new GameObject("linerenderpair").AddComponent<LineRenderPair>();
             lnp.SetupLineRenderPair(m_GravNode1.lineRendererTransform, m_GravNode2.lineRendererTransform, 0.05f);
@@ -72,7 +81,6 @@ public struct SolveConstraintsJob : IJobParallelFor
         // TODO:: branching in the hot path here... perhaps separate the distance validation and correction vector calculation steps.
         if (current_distance == 0)
             return;
-
         float scalar = linkStiffness[index];
         
         float3 correctionVector = (gn1Togn2 * (1.0f - restDistance / current_distance));

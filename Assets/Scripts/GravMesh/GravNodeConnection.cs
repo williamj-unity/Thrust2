@@ -40,8 +40,6 @@ public class Link
         if (draw)
         {
             m_VertexStartIndex = gravMesh.AddPair(gn1.m_Position, gn2.m_Position);
-            //LineRenderPair lnp = new GameObject("linerenderpair").AddComponent<LineRenderPair>();
-            //lnp.SetupLineRenderPair(m_GravNode1.lineRendererTransform, m_GravNode2.lineRendererTransform, 0.05f);
         }
 
         m_Stiffness = stiffness;

@@ -13,6 +13,9 @@ public class GravGridBuilder : MonoBehaviour
 
     static ProfilerMarker s_TotalSolverTime = new ProfilerMarker("JobsSolverTime");
     static ProfilerMarker s_PrepareSolver = new ProfilerMarker("PrepareConstraintSolver");
+    static ProfilerMarker s_PreparePhsycisStep = new ProfilerMarker("PreparePhysicsStep");
+    static ProfilerMarker s_ResetAccelerations = new ProfilerMarker("ResetAccelertions");
+
     static ProfilerMarker s_SetSolverTransforms = new ProfilerMarker("SetSolverTransforms");
     static ProfilerMarker s_Accumlate = new ProfilerMarker("Accumulate");
 
@@ -40,8 +43,6 @@ public class GravGridBuilder : MonoBehaviour
     public float lineWidth = 0.1f;
 
     private float mLeftOverTime = 0.0f;
-
-
 
     NativeArray<int> startConnectionsIndex;
     NativeArray<int> nodeNumConnections;
@@ -74,8 +75,11 @@ public class GravGridBuilder : MonoBehaviour
             for (int j = 0; j < mVerticalParticles; ++j)
             {
                 Vector3 position = new Vector3(i * spacing, j * spacing, 0);
-                gravGrid[i, j] = new GravNode(position, spacing, index++, transform);
-                gravNodes.Add(gravGrid[i, j]);
+                var gn = new GravNode(position, spacing, index++, transform);
+                gn.AddForce = ApplyForce;
+                gn.SetTargetLocation = SetTargetLocation;
+                gravGrid[i, j] = gn;
+                gravNodes.Add(gn);
             }
         }
 
@@ -145,6 +149,15 @@ public class GravGridBuilder : MonoBehaviour
         newPositions = new NativeArray<float3>(gravNodes.Count, Allocator.Persistent);
         accelerations = new NativeArray<float3>(gravNodes.Count, Allocator.Persistent);
         moveables = new NativeArray<bool>(gravNodes.Count, Allocator.Persistent);
+
+        for (int i = 0; i < gravNodes.Count; ++i)
+        {
+            accelerations[i] = gravNodes[i].m_Acceleration;
+            prevPositions[i] = gravNodes[i].m_PrevPosition;
+            targetPositions[i] = gravNodes[i].m_TargetPosition;
+            moveables[i] = gravNodes[i].m_Moveable;
+            positions[i] = gravNodes[i].m_Position;
+        }
     }
 
     public void AddConnection(GravNode gn1, GravNode gn2, bool draw, float stiffness, GravMesh gravMesh)
@@ -153,31 +166,29 @@ public class GravGridBuilder : MonoBehaviour
         connections.Add(l);
     }
 
+    void SetTargetLocation(float3 target, int index)
+    {
+        targetPositions[index] = target;
+    }
+
+    void ApplyForce(float3 force, int index)
+    {
+        float3 acc = accelerations[index];
+        accelerations[index] = acc + force;
+    }
+
     void Update()
     {
+        s_PreparePhsycisStep.Begin();
         float elapsedTime = Time.deltaTime;
         elapsedTime += mLeftOverTime;
         int timeSteps = Mathf.FloorToInt(elapsedTime / fixedDeltaTimeSeconds);
         timeSteps = Math.Min(timeSteps, 5);
         mLeftOverTime = elapsedTime - timeSteps * fixedDeltaTimeSeconds;
-
-        for (int i = 0; i < gravNodes.Count; ++i)
-        {
-            accelerations[i] = gravNodes[i].m_Acceleration;
-            prevPositions[i] = gravNodes[i].m_PrevPosition;
-            targetPositions[i] = gravNodes[i].m_TargetPosition;
-            moveables[i] = gravNodes[i].m_Moveable;
-        }
+        s_PreparePhsycisStep.End();
 
         for (int z = 0; z < timeSteps; z++)
         {
-            s_PrepareSolver.Begin();
-            for (int j = 0; j < gravNodes.Count; j++)
-            {
-                positions[j] = gravNodes[j].m_Position;
-            }
-            s_PrepareSolver.End();
-
             s_TotalSolverTime.Begin();
             for (int i = 0; i < SolverIterations; i++)
             {
@@ -206,6 +217,7 @@ public class GravGridBuilder : MonoBehaviour
             }
             s_TotalSolverTime.End();
 
+            s_UpdateJobs.Begin();
             var updateJobData = new GravNode.UpdateJob()
             {
                 damping = dampingCoefficient,
@@ -216,8 +228,6 @@ public class GravGridBuilder : MonoBehaviour
                 targetPositions = targetPositions,
                 moveable = moveables
             };
-
-            s_UpdateJobs.Begin();
             JobHandle updateJobHandle = updateJobData.Schedule(gravNodes.Count, 128);
             updateJobHandle.Complete();
             s_UpdateJobs.End();
@@ -237,18 +247,15 @@ public class GravGridBuilder : MonoBehaviour
             updateMeshVertices.Schedule(connections.Count, 128).Complete();
             m_GravMesh.UpdateMesh();
             s_UpdateMeshVerticies.End();
-
-            s_UpdateGraNodePoses.Begin();
-            for (int i = 0; i < gravNodes.Count; ++i)
-            {
-                gravNodes[i].m_Position = positions[i];
-                gravNodes[i].m_PrevPosition = prevPositions[i];
-            }
-            s_UpdateGraNodePoses.End();
         }
 
-        for (int i = 0; i < gravNodes.Count; ++i)
-            gravNodes[i].ResetAcceleration();
+        s_ResetAccelerations.Begin();
+        var resetAccelerations = new GravNode.ResetAcclerations
+        {
+            accelerations = accelerations
+        };
+        resetAccelerations.Schedule(gravNodes.Count, 128).Complete();
+        s_ResetAccelerations.End();
     }
 
     private void OnDestroy()

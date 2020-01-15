@@ -10,6 +10,7 @@ using UnityEngine;
 using Vector3 = UnityEngine.Vector3;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using System;
 
 public class GravNode
 {
@@ -34,6 +35,9 @@ public class GravNode
     public List<int> neighborIndiciesList;
     public List<float> restDistancesList;
     public List<float> stiffnessesList;
+
+    public Action<float3, int> SetTargetLocation;
+    public Action<float3, int> AddForce;
 
     public GravNode(float3 position, float spacing, int index, Transform anchorParent)
     {
@@ -90,7 +94,7 @@ public class GravNode
 
     void SetTargetPosition(float3 position)
     {
-        m_TargetPosition = position;
+        SetTargetLocation(position, m_Index);
     }
 
     public void SetPosition(float3 position)
@@ -103,8 +107,8 @@ public class GravNode
 
     public void ApplyForce(float3 force)
     {
-        if(m_Moveable)
-            m_Acceleration += force;
+        if (m_Moveable)
+            AddForce(force, m_Index);
     }
 
     public void ResetAcceleration()
@@ -211,6 +215,18 @@ public class GravNode
         public void Execute(int index)
         {
             positions[index] = newPositions[index];
+        }
+    }
+
+    [BurstCompile]
+    public struct ResetAcclerations : IJobParallelFor
+    {
+        [WriteOnly]
+        public NativeArray<float3> accelerations;
+
+        public void Execute(int index)
+        {
+            accelerations[index] = float3(0,0,0);
         }
     }
 }

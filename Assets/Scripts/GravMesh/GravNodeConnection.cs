@@ -14,12 +14,14 @@ public class Link
 {
     public float m_RestDistance;
     public float m_Stiffness;
-    public GravNode m_GravNode1, m_GravNode2;
+    public int m_GravNode1PosIndex, m_GravNode2PosIndex;
+    public int m_VertexStartIndex;
+    public bool m_Draw;
 
-    public Link(GravNode gn1, GravNode gn2, bool draw, float stiffness = 1.0f)
+    public Link(GravNode gn1, GravNode gn2, bool draw, float stiffness, GravMesh gravMesh)
     {
-        m_GravNode1 = gn1;
-        m_GravNode2 = gn2;
+        m_GravNode1PosIndex = gn1.m_Index;
+        m_GravNode2PosIndex = gn2.m_Index;
         m_RestDistance = Vector3.Distance(gn1.m_Position,
             gn2.m_Position);
         gn1.m_Connections++;
@@ -33,98 +35,52 @@ public class Link
 
         gn1.stiffnessesList.Add(stiffness);
         gn2.stiffnessesList.Add(stiffness);
+        m_Draw = draw;
 
         if (draw)
         {
-            LineRenderPair lnp = new GameObject("linerenderpair").AddComponent<LineRenderPair>();
-            lnp.SetupLineRenderPair(m_GravNode1.lineRendererTransform, m_GravNode2.lineRendererTransform, 0.05f);
+            m_VertexStartIndex = gravMesh.AddPair(gn1.m_Position, gn2.m_Position);
+            //LineRenderPair lnp = new GameObject("linerenderpair").AddComponent<LineRenderPair>();
+            //lnp.SetupLineRenderPair(m_GravNode1.lineRendererTransform, m_GravNode2.lineRendererTransform, 0.05f);
         }
 
         m_Stiffness = stiffness;
     }
 
-    public void OffsetNodeConnection(Vector3 correctionVectorHalf)
+    [BurstCompile]
+    public struct UpdateMeshVertices : IJobParallelFor
     {
-        m_GravNode1.OffsetPos(correctionVectorHalf);
-        m_GravNode2.OffsetPos(-correctionVectorHalf);
-    }
-}
+        [ReadOnly]
+        public NativeArray<float3> positions;
+        [ReadOnly]
+        public NativeArray<int> gn1PositionIndex;
+        [ReadOnly]
+        public NativeArray<int> gn2PositionIndex;
+        [ReadOnly]
+        public NativeArray<int> vertexStartIndex;
+        [ReadOnly]
+        public NativeArray<bool> draw;
+        [ReadOnly]
+        public float lineWidth;
+        [WriteOnly]
+        [NativeDisableParallelForRestriction]
+        public NativeArray<float3> vertixPositions;
 
-[BurstCompile]
-public struct SolveConstraintsJob : IJobParallelFor
-{
-    [ReadOnly]
-    public NativeArray<float> restDistances;
-    [ReadOnly]
-    public NativeArray<float> linkStiffness;
-    [ReadOnly]
-    public NativeArray<float3> positions;
-    [ReadOnly]
-    public NativeArray<int> gn1Indicies;
-    [ReadOnly]
-    public NativeArray<int> gn2Indicies;
-    [WriteOnly]
-    //half of the correction vector for the connection
-    public NativeArray<float3> results;
-
-    public void Execute(int index)
-    {
-        //float3 gn2Pos = gn2Postions[index];
-        int index1 = gn1Indicies[index];
-        int index2 = gn2Indicies[index];
-        float3 gn1Pos = positions[index1];
-        float3 gn2Pos = positions[index2];
-        float restDistance = restDistances[index];
-
-        float3 gn1Togn2 = gn2Pos - gn1Pos;
-        float current_distance = math.distance(gn2Pos, gn1Pos);
-        // TODO:: branching in the hot path here... perhaps separate the distance validation and correction vector calculation steps.
-        if (current_distance == 0)
-            return;
-        float scalar = linkStiffness[index];
-        
-        float3 correctionVector = (gn1Togn2 * (1.0f - restDistance / current_distance));
-
-        results[index] = correctionVector * 0.5f * scalar;
-    }
-}
-
-[BurstCompile]
-public struct UpdateParticlePositions : IJobParallelFor
-{
-    [ReadOnly]
-    public NativeArray<float3> results;
-    [ReadOnly]
-    public NativeArray<int> position1Index;
-    [ReadOnly]
-    public NativeArray<int> position2Index;
-    [ReadOnly]
-    public NativeArray<int> connections;
-    [ReadOnly]
-    public NativeArray<bool> moveables;
-    [ReadOnly]
-    public NativeArray<float3> currentPositions;
-    [WriteOnly]
-    public NativeArray<float3> positions;
-
-    public void Execute(int index)
-    {
-        int gn1I = position1Index[index];
-        int gn2I = position2Index[index];
-        if (moveables[gn1I])
+        public void Execute(int index)
         {
-            float3 pos1 = currentPositions[gn1I];
-            int con1 = connections[gn1I];
-            pos1 += results[index] / con1;
-            positions[gn1I] = pos1;
-        }
+            if (!draw[index])
+                return;
 
-        if (moveables[gn2I])
-        {
-            float3 pos2 = currentPositions[gn2I];
-            int con2 = connections[gn2I];
-            pos2 -= results[index] / con2;
-            positions[gn2I] = pos2;
+            float3 position1 = positions[gn1PositionIndex[index]];
+            float3 position2 = positions[gn2PositionIndex[index]];
+            float3 perp = math.cross(position2 - position1, float3(0,0,-1) * lineWidth);
+
+            vertixPositions[vertexStartIndex[index]] = position1 - perp;
+            vertixPositions[vertexStartIndex[index] + 1] = position1 + perp;
+            vertixPositions[vertexStartIndex[index] + 2] = position2 - perp;
+            vertixPositions[vertexStartIndex[index] + 3] = position2 + perp;
         }
     }
+
 }
+

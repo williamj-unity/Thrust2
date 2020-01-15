@@ -35,11 +35,8 @@ public class GravNode
     public List<float> restDistancesList;
     public List<float> stiffnessesList;
 
-
-    public GravNode(float3 position, float spacing, int index)
+    public GravNode(float3 position, float spacing, int index, Transform anchorParent)
     {
-        lineRendererTransform = new GameObject("LineRendererTransform").transform;
-        lineRendererTransform.position = position;
         m_Position = position;
         m_PrevPosition = position;
         m_TargetPosition = m_Position;
@@ -48,14 +45,14 @@ public class GravNode
         m_Index = index;
         m_Moveable = true;
         gravNodeColliderParent = new GameObject("GravNodeAnchor").AddComponent<GravNodeCollider>();
-        gravNodeColliderParent.SetSpacing(spacing);
-        gravNodeColliderParent.transform.position = position;
+        gravNodeColliderParent.SetSpacing(spacing/2);
         gravNodeColliderParent.affectorCollisionEnter += AffectorCollisionEnter;
         gravNodeColliderParent.affectorCollisionExit += AffectorCollisionExit;
+        gravNodeColliderParent.transform.parent = anchorParent;
+        gravNodeColliderParent.transform.localPosition = position;
         neighborIndiciesList = new List<int>();
         stiffnessesList = new List<float>();
         restDistancesList = new List<float>();
-
     }
 
     public void ConvertNeighborListToNativeArray()
@@ -119,7 +116,6 @@ public class GravNode
     {
         m_Position = position;
         m_PrevPosition = prevPosition;
-        lineRendererTransform.position = m_Position;
     }
 
     [BurstCompile]

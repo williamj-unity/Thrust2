@@ -8,9 +8,10 @@ using Unity.Mathematics;
 using Unity.Profiling;
 public class GravGridBuilder : MonoBehaviour
 {
-    static ProfilerMarker s_TransformUpdate = new ProfilerMarker("TransformUpdate");
+    static ProfilerMarker s_UpdateGraNodePoses = new ProfilerMarker("UpdateGravNodePoses");
+    static ProfilerMarker s_UpdateMeshVerticies = new ProfilerMarker("UpdateMeshVertices");
+
     static ProfilerMarker s_TotalSolverTime = new ProfilerMarker("JobsSolverTime");
-    static ProfilerMarker s_SingleSolverIterations = new ProfilerMarker("SingleJobIteration");
     static ProfilerMarker s_PrepareSolver = new ProfilerMarker("PrepareConstraintSolver");
     static ProfilerMarker s_SetSolverTransforms = new ProfilerMarker("SetSolverTransforms");
     static ProfilerMarker s_Accumlate = new ProfilerMarker("Accumulate");
@@ -36,11 +37,11 @@ public class GravGridBuilder : MonoBehaviour
     public float spacing;
     public bool drawDiagonals = false;
     public float planeLinkStiffness = 1.0f;
+    public float lineWidth = 0.1f;
 
     private float mLeftOverTime = 0.0f;
 
-    NativeArray<int> gn1Index;
-    NativeArray<int> gn2Index;
+
 
     NativeArray<int> startConnectionsIndex;
     NativeArray<int> nodeNumConnections;
@@ -55,35 +56,44 @@ public class GravGridBuilder : MonoBehaviour
     NativeArray<float3> accelerations;
     NativeArray<bool> moveables;
 
+    NativeArray<int> gn1Index;
+    NativeArray<int> gn2Index;
+    NativeArray<bool> drawables;
+    NativeArray<int> vertexStartIndices;
+
+    GravMesh m_GravMesh;
+
     void Start()
     {
         fixedDeltaTimeSeconds = (float)fixedDeltaTime / 1000.0f;
         gravGrid = new GravNode[mHorizontalParticles, mVerticalParticles];
         gravNodes = new List<GravNode>(mHorizontalParticles * mVerticalParticles);
-        int index = 0;  
+        int index = 0;
         for (int i = 0; i < mHorizontalParticles; ++i)
         {
             for (int j = 0; j < mVerticalParticles; ++j)
             {
-                Vector3 position = new Vector3(i * spacing, j * spacing, 0) + transform.position;
-                gravGrid[i,j] = new GravNode(position, spacing, index++);
+                Vector3 position = new Vector3(i * spacing, j * spacing, 0);
+                gravGrid[i, j] = new GravNode(position, spacing, index++, transform);
                 gravNodes.Add(gravGrid[i, j]);
             }
         }
 
-        for(int x = 0; x < mHorizontalParticles; x++)
+        m_GravMesh = new GravMesh(lineWidth, GetComponent<MeshFilter>());
+
+        for (int x = 0; x < mHorizontalParticles; x++)
         {
-            for(int y = 0; y < mVerticalParticles; y++)
+            for (int y = 0; y < mVerticalParticles; y++)
             {
-                if (x < mHorizontalParticles-1) AddConnection(gravGrid[x,y],gravGrid[x+1,y], true, planeLinkStiffness);
-                if (y < mVerticalParticles-1) AddConnection(gravGrid[x,y],gravGrid[x,y+1], true, planeLinkStiffness);
-                if (x < mHorizontalParticles-1 && y < mVerticalParticles-1) AddConnection(gravGrid[x,y],gravGrid[x+1,y+1], drawDiagonals, planeLinkStiffness);
-                if (x < mHorizontalParticles-1 && y < mVerticalParticles-1) AddConnection(gravGrid[x+1,y],gravGrid[x,y+1], drawDiagonals, planeLinkStiffness);
+                if (x < mHorizontalParticles - 1) AddConnection(gravGrid[x, y], gravGrid[x + 1, y], true, planeLinkStiffness, m_GravMesh);
+                if (y < mVerticalParticles - 1) AddConnection(gravGrid[x, y], gravGrid[x, y + 1], true, planeLinkStiffness, m_GravMesh);
+                if (x < mHorizontalParticles - 1 && y < mVerticalParticles - 1) AddConnection(gravGrid[x, y], gravGrid[x + 1, y + 1], drawDiagonals, planeLinkStiffness, m_GravMesh);
+                if (x < mHorizontalParticles - 1 && y < mVerticalParticles - 1) AddConnection(gravGrid[x + 1, y], gravGrid[x, y + 1], drawDiagonals, planeLinkStiffness, m_GravMesh);
                 // configure extended connections
-                if (x < mHorizontalParticles - 2) AddConnection(gravGrid[x, y], gravGrid[x + 2, y], drawDiagonals);
-                if (y < mVerticalParticles - 2) AddConnection(gravGrid[x, y], gravGrid[x, y + 2], drawDiagonals);
-                if (x < mHorizontalParticles - 2 && y < mVerticalParticles - 2) AddConnection(gravGrid[x, y], gravGrid[x + 2, y + 2], drawDiagonals, planeLinkStiffness);
-                if (x < mHorizontalParticles - 2 && y < mVerticalParticles - 2) AddConnection(gravGrid[x + 2, y], gravGrid[x, y + 2], drawDiagonals, planeLinkStiffness);
+                if (x < mHorizontalParticles - 2) AddConnection(gravGrid[x, y], gravGrid[x + 2, y], drawDiagonals, planeLinkStiffness, m_GravMesh);
+                if (y < mVerticalParticles - 2) AddConnection(gravGrid[x, y], gravGrid[x, y + 2], drawDiagonals, planeLinkStiffness, m_GravMesh);
+                if (x < mHorizontalParticles - 2 && y < mVerticalParticles - 2) AddConnection(gravGrid[x, y], gravGrid[x + 2, y + 2], drawDiagonals, planeLinkStiffness, m_GravMesh);
+                if (x < mHorizontalParticles - 2 && y < mVerticalParticles - 2) AddConnection(gravGrid[x + 2, y], gravGrid[x, y + 2], drawDiagonals, planeLinkStiffness, m_GravMesh);
 
                 if (x == 0) gravGrid[x, y].m_Moveable = false;
                 if (y == 0) gravGrid[x, y].m_Moveable = false;
@@ -92,14 +102,21 @@ public class GravGridBuilder : MonoBehaviour
             }
         }
 
+        m_GravMesh.ConstructMesh();
+
         gn1Index = new NativeArray<int>(connections.Count, Allocator.Persistent);
         gn2Index = new NativeArray<int>(connections.Count, Allocator.Persistent);
+        vertexStartIndices = new NativeArray<int>(connections.Count, Allocator.Persistent);
+        drawables = new NativeArray<bool>(connections.Count, Allocator.Persistent);
 
         for (int j = 0; j < connections.Count; j++)
         {
-            gn1Index[j] = connections[j].m_GravNode1.m_Index;
-            gn2Index[j] = connections[j].m_GravNode2.m_Index;
+            gn1Index[j] = connections[j].m_GravNode1PosIndex;
+            gn2Index[j] = connections[j].m_GravNode2PosIndex;
+            drawables[j] = connections[j].m_Draw;
+            vertexStartIndices[j] = connections[j].m_VertexStartIndex;
         }
+
         nodeNumConnections = new NativeArray<int>(gravNodes.Count, Allocator.Persistent);
         startConnectionsIndex = new NativeArray<int>(gravNodes.Count, Allocator.Persistent);
 
@@ -111,7 +128,7 @@ public class GravGridBuilder : MonoBehaviour
             GravNode n = gravNodes[j];
             nodeNumConnections[j] = n.m_Connections;
             startConnectionsIndex[j] = startIndex;
-            for(int i = 0; i < n.m_Connections; i++)
+            for (int i = 0; i < n.m_Connections; i++)
             {
                 startIndex++;
                 allConnectionsList.Add(n.neighborIndiciesList[i]);
@@ -130,9 +147,9 @@ public class GravGridBuilder : MonoBehaviour
         moveables = new NativeArray<bool>(gravNodes.Count, Allocator.Persistent);
     }
 
-    public void AddConnection(GravNode gn1, GravNode gn2, bool draw, float stiffness = 1.0f)
+    public void AddConnection(GravNode gn1, GravNode gn2, bool draw, float stiffness, GravMesh gravMesh)
     {
-        Link l = new Link(gn1, gn2, draw, stiffness);
+        Link l = new Link(gn1, gn2, draw, stiffness, gravMesh);
         connections.Add(l);
     }
 
@@ -164,8 +181,6 @@ public class GravGridBuilder : MonoBehaviour
             s_TotalSolverTime.Begin();
             for (int i = 0; i < SolverIterations; i++)
             {
-
-                s_SingleSolverIterations.Begin();
                 var jobData = new GravNode.SolveContraints
                 {
                     allneighbors = allNodeConnections,
@@ -179,7 +194,6 @@ public class GravGridBuilder : MonoBehaviour
                 };
                 JobHandle handle = jobData.Schedule(gravNodes.Count, 64);
                 handle.Complete();
-                s_SingleSolverIterations.End();
 
                 var swapJobData = new GravNode.SwapBuffers
                 {
@@ -208,10 +222,29 @@ public class GravGridBuilder : MonoBehaviour
             updateJobHandle.Complete();
             s_UpdateJobs.End();
 
-            s_TransformUpdate.Begin();
+            s_UpdateMeshVerticies.Begin();
+            var updateMeshVertices = new Link.UpdateMeshVertices()
+            {
+                positions = positions,
+                gn1PositionIndex = gn1Index,
+                gn2PositionIndex = gn2Index,
+                vertexStartIndex = vertexStartIndices,
+                draw = drawables,
+                lineWidth = lineWidth,
+                vertixPositions = m_GravMesh.vertices
+            };
+
+            updateMeshVertices.Schedule(connections.Count, 128).Complete();
+            m_GravMesh.UpdateMesh();
+            s_UpdateMeshVerticies.End();
+
+            s_UpdateGraNodePoses.Begin();
             for (int i = 0; i < gravNodes.Count; ++i)
-                gravNodes[i].UpdateTransforms(prevPositions[i], positions[i]);
-            s_TransformUpdate.End();
+            {
+                gravNodes[i].m_Position = positions[i];
+                gravNodes[i].m_PrevPosition = prevPositions[i];
+            }
+            s_UpdateGraNodePoses.End();
         }
 
         for (int i = 0; i < gravNodes.Count; ++i)
@@ -227,6 +260,8 @@ public class GravGridBuilder : MonoBehaviour
 
         gn1Index.Dispose();
         gn2Index.Dispose();
+        vertexStartIndices.Dispose();
+        drawables.Dispose();
 
         prevPositions.Dispose();
         positions.Dispose();
@@ -234,5 +269,6 @@ public class GravGridBuilder : MonoBehaviour
         accelerations.Dispose();
         targetPositions.Dispose();
         moveables.Dispose();
+        m_GravMesh.vertices.Dispose();
     }
 }

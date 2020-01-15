@@ -13,7 +13,7 @@ public class LineRenderPair : MonoBehaviour
         gn2Transform = gn2;
         
         lineRenderer = gameObject.AddComponent<LineRenderer>();
-        var mat = Resources.Load<Material>("LineRenderMat");
+        var mat = Resources.Load<Material>("LineRenderer");
         lineRenderer.material = mat;
         lineRenderer.startWidth = width;
         lineRenderer.endWidth = width;

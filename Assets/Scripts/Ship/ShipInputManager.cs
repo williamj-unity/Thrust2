@@ -33,7 +33,7 @@ public class ShipInputManager : MonoBehaviour
                 thrustDir += Vector2.up;
             }
             
-            if (Input.GetKey(KeyCode.A))
+            if (Input.GetKey(KeyCode.Q))
             {
                 thrustDir += Vector2.left;
             }
@@ -43,7 +43,7 @@ public class ShipInputManager : MonoBehaviour
                 thrustDir += Vector2.down;
             }
             
-            if (Input.GetKey(KeyCode.D))
+            if (Input.GetKey(KeyCode.E))
             {
                 thrustDir += Vector2.right;
             }
@@ -51,12 +51,12 @@ public class ShipInputManager : MonoBehaviour
             shipLinearDirectionInput(thrustDir);
             
             float rotationalDirection = 0.0f;
-            if (Input.GetKey(KeyCode.Q))
+            if (Input.GetKey(KeyCode.A))
             {
                 rotationalDirection += 1.0f;
             }
             
-            if (Input.GetKey(KeyCode.E))
+            if (Input.GetKey(KeyCode.D))
             {
                 rotationalDirection -= 1.0f;
             }

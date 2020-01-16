@@ -52,6 +52,7 @@ public class ShipController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        shipRigidBody.drag = drag;
         if (dampersOn)
         {
             AddRotationalThrust(-shipRigidBody.angularVelocity * m_AngularDampingCoef, 1.0f);

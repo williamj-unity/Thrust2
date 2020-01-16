@@ -63,9 +63,11 @@ public class GravGridBuilder : MonoBehaviour
     NativeArray<int> vertexStartIndices;
 
     GravMesh m_GravMesh;
+    Camera gravGridCam;
 
     void Start()
     {
+        gravGridCam = Camera.main;
         fixedDeltaTimeSeconds = (float)fixedDeltaTime / 1000.0f;
         gravGrid = new GravNode[mHorizontalParticles, mVerticalParticles];
         gravNodes = new List<GravNode>(mHorizontalParticles * mVerticalParticles);
@@ -185,6 +187,8 @@ public class GravGridBuilder : MonoBehaviour
         int timeSteps = Mathf.FloorToInt(elapsedTime / fixedDeltaTimeSeconds);
         timeSteps = Math.Min(timeSteps, 5);
         mLeftOverTime = elapsedTime - timeSteps * fixedDeltaTimeSeconds;
+        float4x4 cameraWolrdMatrix = gravGridCam.cameraToWorldMatrix;
+        float3 cameraPos = gravGridCam.transform.position;
         s_PreparePhsycisStep.End();
 
         for (int z = 0; z < timeSteps; z++)
@@ -241,7 +245,10 @@ public class GravGridBuilder : MonoBehaviour
                 vertexStartIndex = vertexStartIndices,
                 draw = drawables,
                 lineWidth = lineWidth,
-                vertixPositions = m_GravMesh.vertices
+                vertixPositions = m_GravMesh.vertices,
+                cameraPos = gravGridCam.transform.position,
+                cameraUp = gravGridCam.transform.up,
+                gravGridPos = transform.position
             };
 
             updateMeshVertices.Schedule(connections.Count, 128).Complete();

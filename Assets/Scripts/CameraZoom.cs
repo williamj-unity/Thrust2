@@ -49,6 +49,9 @@ public class CameraZoom : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        m_CameraPosition.x = transform.position.x;
+        m_CameraPosition.y = transform.position.y;
+
         if (m_ControllerType == ZoomControllerType.Mouse)
         {
             ScrollAction(Input.mouseScrollDelta.y);

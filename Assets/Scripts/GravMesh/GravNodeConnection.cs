@@ -60,6 +60,12 @@ public class Link
         public NativeArray<bool> draw;
         [ReadOnly]
         public float lineWidth;
+        [ReadOnly]
+        public float3 cameraPos;
+        [ReadOnly]
+        public float3 cameraUp;
+        [ReadOnly]
+        public float3 gravGridPos;
         [WriteOnly]
         [NativeDisableParallelForRestriction]
         public NativeArray<float3> vertixPositions;
@@ -71,7 +77,11 @@ public class Link
 
             float3 position1 = positions[gn1PositionIndex[index]];
             float3 position2 = positions[gn2PositionIndex[index]];
-            float3 perp = math.cross(position2 - position1, float3(0,0,-1) * lineWidth);
+
+            float3 pointWorld = (position2 + position1) / 2.0f + gravGridPos;
+            float3 look = math.normalize(pointWorld - cameraPos);
+
+            float3 perp = math.cross(math.normalize(position2 - position1) * lineWidth, look);
 
             vertixPositions[vertexStartIndex[index]] = position1 - perp;
             vertixPositions[vertexStartIndex[index] + 1] = position1 + perp;

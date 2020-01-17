@@ -82,7 +82,7 @@ public class GravNode
     }
     void AffectorCollisionEnter(float mass)
     {
-        Vector3 newPose = m_Position;
+        Vector3 newPose = m_StartPosition;
         newPose.z = mass;
         SetTargetPosition(newPose);
     }

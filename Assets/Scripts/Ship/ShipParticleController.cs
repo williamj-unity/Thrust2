@@ -4,8 +4,6 @@ using UnityEngine;
 
 public class ShipParticleController : MonoBehaviour
 {
-    public ShipInputManager InputManager;
-    
     public ParticleSystem top;
     public ParticleSystem leftTop;
     public ParticleSystem leftBottom;
@@ -13,13 +11,7 @@ public class ShipParticleController : MonoBehaviour
     public ParticleSystem rightBottom;
     public ParticleSystem bottom;
 
-    void Start()
-    {
-        InputManager.shipLinearDirectionInput += ShipLinearDirectionInput;
-        InputManager.shipRotationalDirectionInput += ShipRotationalDirectionInput;
-    }
-
-    private void ShipRotationalDirectionInput(float direction)
+    public void ShipRotationalDirectionInput(float direction)
     {
         if (direction > 0)
         {
@@ -33,7 +25,7 @@ public class ShipParticleController : MonoBehaviour
         }
     }
 
-    private void ShipLinearDirectionInput(Vector2 direction)
+    public void ShipLinearDirectionInput(Vector2 direction)
     {
         if (direction.x > 0)
         {

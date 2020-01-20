@@ -57,6 +57,17 @@ public class GravNode
         neighborIndiciesList = new List<int>();
         stiffnessesList = new List<float>();
         restDistancesList = new List<float>();
+        m_Connections = 0;
+    }
+
+    public void SetHomePosition(Vector3 position)
+    {
+        m_Position = position;
+        m_PrevPosition = position;
+        m_TargetPosition = m_Position;
+        m_StartPosition = m_Position;
+        m_Acceleration = float3(0, 0, 0);
+        gravNodeColliderParent.transform.localPosition = position;
     }
 
     public void ConvertNeighborListToNativeArray()
@@ -114,12 +125,6 @@ public class GravNode
     public void ResetAcceleration()
     {
         m_Acceleration = float3(0, 0, 0);
-    }
-
-    public void UpdateTransforms(float3 prevPosition, float3 position)
-    {
-        m_Position = position;
-        m_PrevPosition = prevPosition;
     }
 
     [BurstCompile]

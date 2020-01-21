@@ -31,40 +31,58 @@ public class GravMesh
         mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
     }
 
-
-    public int AddPair(float3 position1, float3 position2)
+    //each node will have 8 verticies it can use to form a line segment with up to 4 other nodes
+    int vertIndex = 0;
+    public int AddNode()
     {
-        float3 perp = Vector3.Cross(position2 - position1, -Vector3.forward * lineWidth);
-
-        //gn1 node vertices
-        newVertices.Add(position1 - perp);
-        newVertices.Add(position1 + perp);
-
-        //gn2 node vertices
-        newVertices.Add(position2 - perp);
-        newVertices.Add(position2 + perp);
-
-        newTriangles.Add(index);
-        newTriangles.Add(index + 2);
-        newTriangles.Add(index + 1);
-        newTriangles.Add(index + 2);
-        newTriangles.Add(index + 3);
-        newTriangles.Add(index + 1);
-
+        newVertices.Add(0);
+        newVertices.Add(0);
         newNormals.Add(-Vector3.forward);
         newNormals.Add(-Vector3.forward);
-        newNormals.Add(-Vector3.forward);
-        newNormals.Add(-Vector3.forward);
+        newUV.Add(Vector2.zero);
+        newUV.Add(Vector2.zero);
 
-        newUV.Add(new Vector2(0, 0));
-        newUV.Add(new Vector2(1, 0));
-        newUV.Add(new Vector2(0, 1));
-        newUV.Add(new Vector2(1, 1));
-        int ret = index;
-        index += 4;
+        newVertices.Add(0);
+        newVertices.Add(0);
+        newNormals.Add(-Vector3.forward);
+        newNormals.Add(-Vector3.forward);
+        newUV.Add(Vector2.zero);
+        newUV.Add(Vector2.zero);
+
+        newVertices.Add(0);
+        newVertices.Add(0);
+        newNormals.Add(-Vector3.forward);
+        newNormals.Add(-Vector3.forward);
+        newUV.Add(Vector2.zero);
+        newUV.Add(Vector2.zero);
+
+        newVertices.Add(0);
+        newVertices.Add(0);
+        newNormals.Add(-Vector3.forward);
+        newNormals.Add(-Vector3.forward);
+        newUV.Add(Vector2.zero);
+        newUV.Add(Vector2.zero);
+
+        int ret = vertIndex;
+        vertIndex += 8;
         return ret;
     }
 
+
+    public void AddPair(int gn1, int gn2)
+    {
+        newTriangles.Add(gn1);
+        newTriangles.Add(gn1 + 1);
+        newTriangles.Add(gn2 + 1);
+        newTriangles.Add(gn1);
+        newTriangles.Add(gn2 + 1);
+        newTriangles.Add(gn2);
+
+        newUV[gn1] = new Vector2(0, 0);
+        newUV[gn2] = new Vector2(1, 0);
+        newUV[gn1 + 1] = new Vector2(0, 1);
+        newUV[gn2 + 1] = new Vector2(1, 1);
+    }
 
     public void UpdateMesh()
     {

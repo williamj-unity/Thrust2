@@ -60,7 +60,9 @@ public class GravGridBuilder : MonoBehaviour
     NativeArray<int> gn1Index;
     NativeArray<int> gn2Index;
     NativeArray<bool> drawables;
-    NativeArray<int> vertexStartIndices;
+    NativeArray<int> gn1VertexStartIndices;
+    NativeArray<int> gn2VertexStartIndices;
+
 
     GravMesh m_GravMesh;
     Camera gravGridCam;
@@ -76,6 +78,9 @@ public class GravGridBuilder : MonoBehaviour
         gravGrid = new GravNode[mHorizontalParticles, mVerticalParticles];
         gravNodes = new List<GravNode>(mHorizontalParticles * mVerticalParticles);
         int index = 0;
+        m_GravMesh = new GravMesh(lineWidth, GetComponent<MeshFilter>());
+
+
         for (int i = 0; i < mHorizontalParticles; ++i)
         {
             for (int j = 0; j < mVerticalParticles; ++j)
@@ -83,7 +88,8 @@ public class GravGridBuilder : MonoBehaviour
                 int x = (startX + i) % mHorizontalParticles;
                 int y = (startY + j) % mVerticalParticles;
                 Vector3 position = new Vector3(x * spacing, y * spacing, 0);
-                var gn = new GravNode(position, spacing, index++, transform);
+                int vertexStartIndex = m_GravMesh.AddNode();
+                var gn = new GravNode(position, spacing, index++, transform, vertexStartIndex);
                 gn.AddForce = ApplyForce;
                 gn.SetTargetLocation = SetTargetLocation;
                 gravGrid[x, y] = gn;
@@ -103,7 +109,6 @@ public class GravGridBuilder : MonoBehaviour
             }
         }
 
-        m_GravMesh = new GravMesh(lineWidth, GetComponent<MeshFilter>());
 
         for (int i = 0; i < mHorizontalParticles; i++)
         {
@@ -114,13 +119,13 @@ public class GravGridBuilder : MonoBehaviour
                 
                 if (x < mHorizontalParticles - 1) AddConnection(gravGrid[x, y], gravGrid[x + 1, y], true, planeLinkStiffness, m_GravMesh);
                 if (y < mVerticalParticles - 1) AddConnection(gravGrid[x, y], gravGrid[x, y + 1], true, planeLinkStiffness, m_GravMesh);
-                if (x < mHorizontalParticles - 1 && y < mVerticalParticles - 1) AddConnection(gravGrid[x, y], gravGrid[x + 1, y + 1], drawDiagonals, planeLinkStiffness, m_GravMesh);
-                if (x < mHorizontalParticles - 1 && y < mVerticalParticles - 1) AddConnection(gravGrid[x + 1, y], gravGrid[x, y + 1], drawDiagonals, planeLinkStiffness, m_GravMesh);
+                //if (x < mHorizontalParticles - 1 && y < mVerticalParticles - 1) AddConnection(gravGrid[x, y], gravGrid[x + 1, y + 1], drawDiagonals, planeLinkStiffness, m_GravMesh);
+                //if (x < mHorizontalParticles - 1 && y < mVerticalParticles - 1) AddConnection(gravGrid[x + 1, y], gravGrid[x, y + 1], drawDiagonals, planeLinkStiffness, m_GravMesh);
                 //configure extended connections
-                if (x < mHorizontalParticles - 2) AddConnection(gravGrid[x, y], gravGrid[x + 2, y], drawDiagonals, planeLinkStiffness, m_GravMesh);
-                if (y < mVerticalParticles - 2) AddConnection(gravGrid[x, y], gravGrid[x, y + 2], drawDiagonals, planeLinkStiffness, m_GravMesh);
-                if (x < mHorizontalParticles - 2 && y < mVerticalParticles - 2) AddConnection(gravGrid[x, y], gravGrid[x + 2, y + 2], drawDiagonals, planeLinkStiffness, m_GravMesh);
-                if (x < mHorizontalParticles - 2 && y < mVerticalParticles - 2) AddConnection(gravGrid[x + 2, y], gravGrid[x, y + 2], drawDiagonals, planeLinkStiffness, m_GravMesh);
+                //if (x < mHorizontalParticles - 2) AddConnection(gravGrid[x, y], gravGrid[x + 2, y], drawDiagonals, planeLinkStiffness, m_GravMesh);
+                //if (y < mVerticalParticles - 2) AddConnection(gravGrid[x, y], gravGrid[x, y + 2], drawDiagonals, planeLinkStiffness, m_GravMesh);
+                //if (x < mHorizontalParticles - 2 && y < mVerticalParticles - 2) AddConnection(gravGrid[x, y], gravGrid[x + 2, y + 2], drawDiagonals, planeLinkStiffness, m_GravMesh);
+                //if (x < mHorizontalParticles - 2 && y < mVerticalParticles - 2) AddConnection(gravGrid[x + 2, y], gravGrid[x, y + 2], drawDiagonals, planeLinkStiffness, m_GravMesh);
 
                 //if (x == 0) gravGrid[x, y].m_Moveable = false;
                 //if (y == 0) gravGrid[x, y].m_Moveable = false;
@@ -133,7 +138,9 @@ public class GravGridBuilder : MonoBehaviour
 
         gn1Index = new NativeArray<int>(connections.Count, Allocator.Persistent);
         gn2Index = new NativeArray<int>(connections.Count, Allocator.Persistent);
-        vertexStartIndices = new NativeArray<int>(connections.Count, Allocator.Persistent);
+        gn1VertexStartIndices = new NativeArray<int>(connections.Count, Allocator.Persistent);
+        gn2VertexStartIndices = new NativeArray<int>(connections.Count, Allocator.Persistent);
+
         drawables = new NativeArray<bool>(connections.Count, Allocator.Persistent);
 
         for (int j = 0; j < connections.Count; j++)
@@ -141,7 +148,8 @@ public class GravGridBuilder : MonoBehaviour
             gn1Index[j] = connections[j].m_GravNode1PosIndex;
             gn2Index[j] = connections[j].m_GravNode2PosIndex;
             drawables[j] = connections[j].m_Draw;
-            vertexStartIndices[j] = connections[j].m_VertexStartIndex;
+            gn1VertexStartIndices[j] = connections[j].m_GravNode1VertexStart;
+            gn2VertexStartIndices[j] = connections[j].m_GravNode2VertexStart;
         }
 
         nodeNumConnections = new NativeArray<int>(gravNodes.Count, Allocator.Persistent);
@@ -261,7 +269,8 @@ public class GravGridBuilder : MonoBehaviour
                 positions = positions,
                 gn1PositionIndex = gn1Index,
                 gn2PositionIndex = gn2Index,
-                vertexStartIndex = vertexStartIndices,
+                gn1VertexStartIndices = gn1VertexStartIndices,
+                gn2VertexStartIndices = gn2VertexStartIndices,
                 draw = drawables,
                 lineWidth = lineWidth,
                 vertixPositions = m_GravMesh.vertices,
@@ -293,7 +302,9 @@ public class GravGridBuilder : MonoBehaviour
 
         gn1Index.Dispose();
         gn2Index.Dispose();
-        vertexStartIndices.Dispose();
+        gn1VertexStartIndices.Dispose();
+        gn2VertexStartIndices.Dispose();
+
         drawables.Dispose();
 
         prevPositions.Dispose();

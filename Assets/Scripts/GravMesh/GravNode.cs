@@ -38,8 +38,9 @@ public class GravNode
 
     public Action<float3, int> SetTargetLocation;
     public Action<float3, int> AddForce;
+    public int m_VertexStart;
 
-    public GravNode(float3 position, float spacing, int index, Transform anchorParent)
+    public GravNode(float3 position, float spacing, int index, Transform anchorParent, int vertexStart)
     {
         m_Position = position;
         m_PrevPosition = position;
@@ -58,6 +59,7 @@ public class GravNode
         stiffnessesList = new List<float>();
         restDistancesList = new List<float>();
         m_Connections = 0;
+        m_VertexStart = vertexStart;
     }
 
     public void SetHomePosition(Vector3 position)

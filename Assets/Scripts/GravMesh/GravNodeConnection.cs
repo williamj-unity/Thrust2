@@ -23,8 +23,8 @@ public class Link
     {
         m_GravNode1PosIndex = gn1.m_Index;
         m_GravNode2PosIndex = gn2.m_Index;
-        m_RestDistance = Vector3.Distance(gn1.m_Position,
-            gn2.m_Position);
+        m_RestDistance = Vector3.Distance(gn1.m_StartPosition,
+            gn2.m_StartPosition);
 
         gn1.neighborIndiciesList.Add(gn2.m_Index);
         gn2.neighborIndiciesList.Add(gn1.m_Index);

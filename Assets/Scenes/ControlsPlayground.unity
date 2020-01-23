@@ -5195,8 +5195,8 @@ MonoBehaviour:
   SolverIterations: 3
   dampingCoefficient: 0.9
   fixedDeltaTime: 16
-  mHorizontalParticles: 100
-  mVerticalParticles: 100
+  mHorizontalParticles: 50
+  mVerticalParticles: 50
   spacing: 0.75
   drawDiagonals: 0
   planeLinkStiffness: 0.3
@@ -5272,11 +5272,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 370391341}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 83e8c4546cc6c094e9e4d181dbcc63c1, type: 3}
+  m_Script: {fileID: 11500000, guid: 0731ef1da24d4304b822632590e013ef, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gg1: {fileID: 370391342}
-  gg2: {fileID: 0}
+  gravGrid: {fileID: 370391342}
+  objectToKeepAtCenter: {fileID: 1934508649}
+  radius: 1
+  time: 0.25
 --- !u!1 &480541212
 GameObject:
   m_ObjectHideFlags: 0
@@ -10185,7 +10187,7 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.3
+  near clip plane: 0.01
   far clip plane: 1000
   field of view: 60
   orthographic: 0

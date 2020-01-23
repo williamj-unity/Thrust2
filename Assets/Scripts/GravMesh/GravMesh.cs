@@ -89,9 +89,15 @@ public class GravMesh
         mesh.SetVertices(vertices);
     }
 
+    public void DrawMesh()
+    {
+        mesh.RecalculateBounds();
+    }
+
     public void ConstructMesh()
     {
-        vertices = new NativeArray<float3>(newVertices.ToArray(), Allocator.Persistent);
+        if(!vertices.IsCreated)
+            vertices = new NativeArray<float3>(newVertices.ToArray(), Allocator.Persistent);
         var newTrianglesArray = newTriangles.ToArray();
         var normalsArray = newNormals.ToArray();
         var newUVArray = newUV.ToArray();
@@ -100,5 +106,7 @@ public class GravMesh
         mesh.uv = newUVArray;
         mesh.triangles = newTrianglesArray;
         mesh.normals = normalsArray;
+
+        newTriangles.Clear();
     }
 }

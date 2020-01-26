@@ -28,9 +28,6 @@ public class GravNode
     public int m_Index;
 
     protected float rigidity = 1.0f;
-    public NativeArray<int> neighborIndicies;
-    public NativeArray<float> restDistances;
-    public NativeArray<float> stiffnesses;
 
     public List<int> neighborIndiciesList;
     public List<float> restDistancesList;
@@ -39,9 +36,13 @@ public class GravNode
     public Action<float3, int> SetTargetLocation;
     public Action<float3, int> AddForce;
     public int m_VertexStart;
+    public Queue<int> availibleVertexPositions;
+
+    public List<Link> m_Links;
 
     public GravNode(float3 position, float spacing, int index, Transform anchorParent, int vertexStart)
     {
+        m_Links = new List<Link>();
         m_Position = position;
         m_PrevPosition = position;
         m_TargetPosition = m_Position;
@@ -60,6 +61,24 @@ public class GravNode
         restDistancesList = new List<float>();
         m_Connections = 0;
         m_VertexStart = vertexStart;
+        availibleVertexPositions = new Queue<int>();
+        // max of 4 pairs of verts availbles for drawing.
+        for(int i = 0; i < 4; i++)
+        {
+            availibleVertexPositions.Enqueue(m_VertexStart + i * 2);
+        }
+    }
+
+    public int FindLinkIndex(GravNode gn2)
+    {
+        for(int i = 0; i < m_Links.Count; i++)
+        {
+            if(m_Links[i].m_Gn2.m_Index == gn2.m_Index)
+            {
+                return m_Links[i].m_Index;
+            }
+        }
+        return -1;
     }
 
     public void SetHomePosition(Vector3 position)
@@ -72,27 +91,6 @@ public class GravNode
         gravNodeColliderParent.transform.localPosition = position;
     }
 
-    public void ConvertNeighborListToNativeArray()
-    {
-        neighborIndicies = new NativeArray<int>(neighborIndiciesList.ToArray(), Allocator.Persistent);
-        restDistances = new NativeArray<float>(restDistancesList.ToArray(), Allocator.Persistent);
-        stiffnesses = new NativeArray<float>(stiffnessesList.ToArray(), Allocator.Persistent);
-    }
-
-    ~GravNode()
-    {
-        neighborIndicies.Dispose();
-        restDistances.Dispose();
-        stiffnesses.Dispose();
-    }
-
-    public void OffsetPos(float3 correctionVectorHalf)
-    {
-        if (m_Moveable && m_Connections > 0)
-        {
-            m_Position += (correctionVectorHalf / m_Connections);
-        }
-    }
     void AffectorCollisionEnter(float mass)
     {
         Vector3 newPose = m_StartPosition;
@@ -110,23 +108,10 @@ public class GravNode
         SetTargetLocation(position, m_Index);
     }
 
-    public void SetPosition(float3 position)
-    {
-        if(m_Moveable)
-        {
-            m_Position = position;
-        }
-    }
-
     public void ApplyForce(float3 force)
     {
         if (m_Moveable)
             AddForce(force, m_Index);
-    }
-
-    public void ResetAcceleration()
-    {
-        m_Acceleration = float3(0, 0, 0);
     }
 
     [BurstCompile]

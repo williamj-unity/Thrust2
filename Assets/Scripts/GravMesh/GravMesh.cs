@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -16,7 +17,12 @@ public class GravMesh
     List<Vector3> newNormals;
     int index;
 
+    Queue<int> availableTriIndex;
+
     public NativeArray<float3> vertices;
+    public int[] triangles;
+
+    bool requiresFullRebuild = false;
 
     public GravMesh(float lineWidth, MeshFilter meshFilter)
     {
@@ -29,6 +35,7 @@ public class GravMesh
         newNormals = new List<Vector3>();
         newUV = new List<Vector2>();
         mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+        availableTriIndex = new Queue<int>();
     }
 
     //each node will have 8 verticies it can use to form a line segment with up to 4 other nodes
@@ -68,43 +75,64 @@ public class GravMesh
         return ret;
     }
 
-
-    public void AddPair(int gn1, int gn2)
+    internal void RemovePair(int startIndex)
     {
-        newTriangles.Add(gn1);
-        newTriangles.Add(gn1 + 1);
-        newTriangles.Add(gn2 + 1);
-        newTriangles.Add(gn1);
-        newTriangles.Add(gn2 + 1);
-        newTriangles.Add(gn2);
+        availableTriIndex.Enqueue(startIndex);
+    }
+
+    public int AddPair(int gn1, int gn2)
+    {
+        int ret = 0;
+        if (availableTriIndex.Count != 0)
+        {
+            ret = availableTriIndex.Dequeue();
+            triangles[ret] = gn1;
+            triangles[ret + 1] = gn1 + 1;
+            triangles[ret + 2] = gn2 + 1;
+            triangles[ret + 3] = gn1;
+            triangles[ret + 4] = gn2 + 1;
+            triangles[ret + 5] = gn2;
+        }
+        else
+        {
+            requiresFullRebuild = true;
+            ret = newTriangles.Count;
+            newTriangles.Add(gn1);
+            newTriangles.Add(gn1 + 1);
+            newTriangles.Add(gn2 + 1);
+            newTriangles.Add(gn1);
+            newTriangles.Add(gn2 + 1);
+            newTriangles.Add(gn2);
+        }
 
         newUV[gn1] = new Vector2(0, 0);
         newUV[gn2] = new Vector2(1, 0);
         newUV[gn1 + 1] = new Vector2(0, 1);
         newUV[gn2 + 1] = new Vector2(1, 1);
+
+        return ret;
     }
 
     public void UpdateMesh()
     {
         mesh.SetVertices(vertices);
-    }
-
-    public void DrawMesh()
-    {
-        mesh.RecalculateBounds();
+        mesh.SetTriangles(triangles, 0, true);
+        mesh.SetUVs(0, newUV);
     }
 
     public void ConstructMesh()
     {
         if(!vertices.IsCreated)
             vertices = new NativeArray<float3>(newVertices.ToArray(), Allocator.Persistent);
-        var newTrianglesArray = newTriangles.ToArray();
+
+
+        triangles = newTriangles.ToArray();
         var normalsArray = newNormals.ToArray();
         var newUVArray = newUV.ToArray();
 
         mesh.SetVertices(vertices);
         mesh.uv = newUVArray;
-        mesh.triangles = newTrianglesArray;
+        mesh.triangles = triangles;
         mesh.normals = normalsArray;
 
         newTriangles.Clear();

@@ -5197,7 +5197,7 @@ MonoBehaviour:
   fixedDeltaTime: 16
   mHorizontalParticles: 50
   mVerticalParticles: 50
-  spacing: 0.75
+  spacing: 1
   drawDiagonals: 0
   planeLinkStiffness: 0.3
   lineWidth: 0.2

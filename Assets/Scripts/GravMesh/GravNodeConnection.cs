@@ -9,22 +9,31 @@ using UnityEngine.Assertions;
 using Unity.Mathematics;
 using Unity.Burst;
 using static Unity.Mathematics.math;
+using System;
 
 public class Link
 {
     public float m_RestDistance;
-    public float m_Stiffness;
     public int m_GravNode1PosIndex, m_GravNode2PosIndex;
     public int m_VertexStartIndex;
     public int m_GravNode1VertexStart, m_GravNode2VertexStart;
     public bool m_Draw;
+    public GravNode m_Gn1;
+    public GravNode m_Gn2;
+    public int m_TrianglesIndex;
+    public int m_Index;
 
-    public Link(GravNode gn1, GravNode gn2, bool draw, float stiffness, GravMesh gravMesh)
+    public Link(GravNode gn1, GravNode gn2, bool draw, GravMesh gravMesh, int index)
     {
+        m_Index = index;
+        m_Gn1 = gn1;
+        m_Gn2 = gn2;
         m_GravNode1PosIndex = gn1.m_Index;
         m_GravNode2PosIndex = gn2.m_Index;
         m_RestDistance = Vector3.Distance(gn1.m_StartPosition,
             gn2.m_StartPosition);
+
+        gn1.m_Links.Add(this);
 
         gn1.neighborIndiciesList.Add(gn2.m_Index);
         gn2.neighborIndiciesList.Add(gn1.m_Index);
@@ -32,21 +41,42 @@ public class Link
         gn1.restDistancesList.Add(m_RestDistance);
         gn2.restDistancesList.Add(m_RestDistance);
 
-        gn1.stiffnessesList.Add(stiffness);
-        gn2.stiffnessesList.Add(stiffness);
         m_Draw = draw;
 
         if (draw)
         {
-            m_GravNode1VertexStart = (gn1.m_Connections * 2) + gn1.m_VertexStart;
-            m_GravNode2VertexStart = (gn2.m_Connections * 2) + gn2.m_VertexStart;
-            gravMesh.AddPair(m_GravNode1VertexStart, m_GravNode2VertexStart);
+            if (gn1.availibleVertexPositions.Count == 0)
+                Debug.LogError("No more vertices are available for rendering this connection");
+
+            m_GravNode1VertexStart = gn1.availibleVertexPositions.Dequeue();
+
+            if (gn2.availibleVertexPositions.Count == 0)
+                Debug.LogError("No more vertices are available for rendering this connection");
+
+            m_GravNode2VertexStart = gn2.availibleVertexPositions.Dequeue();
+            m_TrianglesIndex = gravMesh.AddPair(m_GravNode1VertexStart, m_GravNode2VertexStart);
         }
 
         gn1.m_Connections++;
         gn2.m_Connections++;
+    }
 
-        m_Stiffness = stiffness;
+    internal void BreakLink(GravMesh gravMesh)
+    {
+        m_Gn1.m_Links.Remove(this);
+
+        m_Gn1.neighborIndiciesList.Remove(m_Gn2.m_Index);
+        m_Gn2.neighborIndiciesList.Remove(m_Gn1.m_Index);
+
+        m_Gn1.restDistancesList.Remove(m_RestDistance);
+        m_Gn2.restDistancesList.Remove(m_RestDistance);
+
+        gravMesh.RemovePair(m_TrianglesIndex);
+        m_Gn1.availibleVertexPositions.Enqueue(m_GravNode1VertexStart);
+        m_Gn2.availibleVertexPositions.Enqueue(m_GravNode2VertexStart);
+
+        m_Gn1.m_Connections--;
+        m_Gn2.m_Connections--;
     }
 
     [BurstCompile]
@@ -97,6 +127,5 @@ public class Link
             vertixPositions[gn2VertexStart] = position2 + perp;
         }
     }
-
 }
 

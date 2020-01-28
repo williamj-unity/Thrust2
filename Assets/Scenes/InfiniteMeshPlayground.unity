@@ -135,6 +135,7 @@ GameObject:
   - component: {fileID: 370391345}
   - component: {fileID: 370391344}
   - component: {fileID: 370391346}
+  - component: {fileID: 370391347}
   m_Layer: 0
   m_Name: GravGrid
   m_TagString: Untagged
@@ -157,9 +158,9 @@ MonoBehaviour:
   SolverIterations: 3
   dampingCoefficient: 0.9
   fixedDeltaTime: 16
-  mHorizontalParticles: 25
-  mVerticalParticles: 25
-  spacing: 0.5
+  mHorizontalParticles: 100
+  mVerticalParticles: 100
+  spacing: 0.6
   drawDiagonals: 0
   planeLinkStiffness: 0.3
   lineWidth: 0.1
@@ -171,7 +172,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 370391341}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4.2, y: -6.55, z: 0}
+  m_LocalPosition: {x: -15.48, y: -8.33, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -238,6 +239,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   timerTime: 2
+--- !u!114 &370391347
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 370391341}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0731ef1da24d4304b822632590e013ef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gravGrid: {fileID: 370391342}
+  objectToKeepAtCenter: {fileID: 1215619599}
+  radius: 0.2
+  time: 0
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -347,7 +364,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 519420028}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -10}
+  m_LocalPosition: {x: 0, y: 0, z: -20.02}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -587,7 +604,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 43ad77824c8f1d746ba5aab9ea03a3ea, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mass: 499.9
+  mass: 50
 --- !u!114 &1215619601
 MonoBehaviour:
   m_ObjectHideFlags: 0

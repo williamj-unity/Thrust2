@@ -7,7 +7,6 @@ using UnityEngine;
 
 public class GravMesh
 {
-    float lineWidth = 0.1f;
     MeshFilter filter;
     Mesh mesh;
 
@@ -24,11 +23,15 @@ public class GravMesh
 
     bool requiresFullRebuild = false;
 
-    public GravMesh(float lineWidth, MeshFilter meshFilter)
+    Material material;
+
+    public GravMesh(float radius, MeshFilter meshFilter)
     {
         mesh = new Mesh();
         filter = meshFilter;
         filter.mesh = mesh;
+        material = meshFilter.GetComponent<MeshRenderer>().material;
+        material.SetFloat("Vector1_948E4DE1", radius);
         index = 0;
         newVertices = new List<float3>();
         newTriangles = new List<int>();
@@ -113,11 +116,13 @@ public class GravMesh
         return ret;
     }
 
-    public void UpdateMesh()
+    public void UpdateMesh(Vector2 center)
     {
+        material.SetVector("Vector2_7F65F0F6", new Vector4(center.x, center.y));
         mesh.SetVertices(vertices);
-        mesh.SetTriangles(triangles, 0, true);
         mesh.SetUVs(0, newUV);
+        mesh.SetTriangles(triangles, 0, true);
+        mesh.RecalculateBounds();
     }
 
     public void ConstructMesh()
@@ -125,16 +130,25 @@ public class GravMesh
         if(!vertices.IsCreated)
             vertices = new NativeArray<float3>(newVertices.ToArray(), Allocator.Persistent);
 
-
         triangles = newTriangles.ToArray();
         var normalsArray = newNormals.ToArray();
         var newUVArray = newUV.ToArray();
 
         mesh.SetVertices(vertices);
         mesh.uv = newUVArray;
-        mesh.triangles = triangles;
+        mesh.SetTriangles(triangles, 0);
         mesh.normals = normalsArray;
 
         newTriangles.Clear();
+    }
+
+    internal void SetRange(float min, float max)
+    {
+        material.SetVector("Vector2_4B799240", new Vector4(min, max));
+    }
+
+    internal void SetCurrentZoom(float currentScale)
+    {
+        material.SetFloat("Vector1_5033AE16", currentScale);
     }
 }

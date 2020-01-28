@@ -22,8 +22,9 @@ public class Link
     public GravNode m_Gn2;
     public int m_TrianglesIndex;
     public int m_Index;
+    public float m_Thickness;
 
-    public Link(GravNode gn1, GravNode gn2, bool draw, GravMesh gravMesh, int index)
+    public Link(GravNode gn1, GravNode gn2, bool draw, GravMesh gravMesh, float thickness, int index)
     {
         m_Index = index;
         m_Gn1 = gn1;
@@ -42,6 +43,7 @@ public class Link
         gn2.restDistancesList.Add(m_RestDistance);
 
         m_Draw = draw;
+        m_Thickness = thickness;
 
         if (draw)
         {
@@ -95,7 +97,7 @@ public class Link
         [ReadOnly]
         public NativeArray<bool> draw;
         [ReadOnly]
-        public float lineWidth;
+        public NativeArray<float> lineWidth;
         [ReadOnly]
         public float3 cameraPos;
         [ReadOnly]
@@ -117,7 +119,7 @@ public class Link
             float3 pointWorld = (position2 + position1) / 2.0f + gravGridPos;
             float3 look = math.normalize(pointWorld - cameraPos);
 
-            float3 perp = math.cross(math.normalize(position2 - position1) * lineWidth, look);
+            float3 perp = math.cross(math.normalize(position2 - position1) * lineWidth[index], look);
             int gn1VertexStart = gn1VertexStartIndices[index];
             int gn2VertexStart = gn2VertexStartIndices[index];
 

@@ -22,6 +22,8 @@ public class GravMeshShifter : MonoBehaviour
         if (timer < time)
             return;
 
+        timer = 0;
+
         Vector3 pos = objectToKeepAtCenter.position;
         Vector3 center = gravGrid.GetMeshCenterWorld();
         Vector3 dir = (pos - center) * spacing;
@@ -29,29 +31,24 @@ public class GravMeshShifter : MonoBehaviour
         if (Vector3.Distance(center, pos) < radius)
             return;
 
-        timer = 0;
-
-        int stepsX = Mathf.FloorToInt(Mathf.Abs(dir.x));
-        int stepY = Mathf.FloorToInt(Mathf.Abs(dir.y));
-
         if(dir.x > radius/2.0f)
         {
-            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Right, stepsX);
+            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Right, 1);
         }
 
         if (dir.y > radius / 2.0f)
         {
-            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Up, stepY);
+            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Up, 1);
         }
 
         if (dir.x < -radius / 2.0f)
         {
-            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Left, stepsX);
+            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Left, 1);
         }
 
         if (dir.y < -radius / 2.0f)
         {
-            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Down, stepY);
+            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Down, 1);
         }
     }
 }

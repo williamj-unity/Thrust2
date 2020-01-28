@@ -5,6 +5,10 @@ using UnityEngine;
 
 public class CameraZoom : MonoBehaviour
 {
+    Vector3 prevPosition;
+    float acceleration;
+    public float accelerationCoef;
+    public float momentumDamping;
 
     // TODO:: this will eventually need to be refactored into an input manager that assigns actions based 
     // on different controller types that are connected. I've added it here now to how this should be done
@@ -29,6 +33,8 @@ public class CameraZoom : MonoBehaviour
 
     private void Start()
     {
+        prevPosition = transform.position;
+        acceleration = 0;
         m_CurrentScale = 1.0f;
         m_CameraPosition = transform.position;
         m_CameraStartPose = m_CameraPosition;
@@ -36,26 +42,37 @@ public class CameraZoom : MonoBehaviour
 
     private void ScrollAction(float scrollDelta)
     {
-        //m_CurrentScale += m_ScrollSpeed * scrollDelta;
-        m_CameraPosition.z += m_ScrollSpeed * scrollDelta;
-        if (m_CameraPosition.z > -1.0f)
-        {
-            m_CameraPosition.z = -1.0f;
-        }
+        acceleration += m_ScrollSpeed * scrollDelta;
 
         m_CurrentScale = Mathf.Abs(m_CameraPosition.z) / 10.0f;
     }
 
-    // Update is called once per frame
     void Update()
     {
-        m_CameraPosition.x = transform.position.x;
-        m_CameraPosition.y = transform.position.y;
-
         if (m_ControllerType == ZoomControllerType.Mouse)
         {
             ScrollAction(Input.mouseScrollDelta.y);
         } // else do diff controller type, maybe you hold the right bumper to zoom out, left zoom scroll in
+    }
+
+    // Update is called once per frame
+    void FixedUpdate()
+    {
+        m_CameraPosition.x = transform.position.x;
+        m_CameraPosition.y = transform.position.y;
+
+        float timeStep = Time.deltaTime;
+        float timeStepSq = timeStep * timeStep;
+
+        float velocity = (transform.position.z - prevPosition.z) * momentumDamping;
+        float next = transform.position.z + (velocity) + accelerationCoef * acceleration * timeStepSq;
+        prevPosition = transform.position;
+        if (m_CameraPosition.z > -1.0f)
+        {
+            next = -1.0f;
+        }
+        m_CameraPosition.z = next;
+        acceleration = 0;
 
         transform.position = m_CameraPosition;
     }

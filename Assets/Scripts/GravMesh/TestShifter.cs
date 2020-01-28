@@ -22,6 +22,6 @@ public class TestShifter : MonoBehaviour
             return;
         time = 0.0f;
 
-        m_Grid.ShiftGrid(GravGridBuilder.GridShiftDirection.Down,1);
+        m_Grid.ShiftGrid(GravGridBuilder.GridShiftDirection.Right,3);
     }
 }

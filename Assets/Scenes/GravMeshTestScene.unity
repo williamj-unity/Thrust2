@@ -157,8 +157,8 @@ MonoBehaviour:
   SolverIterations: 3
   dampingCoefficient: 0.9
   fixedDeltaTime: 16
-  mHorizontalParticles: 20
-  mVerticalParticles: 20
+  mHorizontalParticles: 1000
+  mVerticalParticles: 1000
   spacing: 0.5
   drawDiagonals: 0
   planeLinkStiffness: 0.05

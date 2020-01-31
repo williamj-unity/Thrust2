@@ -71,8 +71,8 @@ public class GravGridBuilder : MonoBehaviour
     NativeArray<int> gn1VertexStartIndices;
     NativeArray<int> gn2VertexStartIndices;
     NativeArray<float> lineWidths;
+    NativeArray<float> baseLineWidths;
 
-    Dictionary<IndexPair, int> mLinks;
     Queue<int> availableConnectionIndex;
 
     GravMesh m_GravMesh;
@@ -84,11 +84,7 @@ public class GravGridBuilder : MonoBehaviour
 
     bool needsConnectionReset = false;
 
-    public struct IndexPair
-    {
-        public int gn1;
-        public int gn2;
-    }
+    private float lineWidthScalar = 1.0f;
 
     void Start()
     {
@@ -99,7 +95,6 @@ public class GravGridBuilder : MonoBehaviour
         int index = 0;
         float meshShaderRadius = mHorizontalParticles * spacing;
         m_GravMesh = new GravMesh(meshShaderRadius, GetComponent<MeshFilter>());
-        mLinks = new Dictionary<IndexPair, int>();
 
         availableConnectionIndex = new Queue<int>();
 
@@ -109,7 +104,7 @@ public class GravGridBuilder : MonoBehaviour
             {
                 Vector3 position = new Vector3(i * spacing, j * spacing, 0);
                 int vertexStartIndex = m_GravMesh.AddNode();
-                var gn = new GravNode(position, spacing, index++, transform, vertexStartIndex);
+                var gn = new GravNode(position, spacing, index++, transform, vertexStartIndex, gameObject.layer);
                 gn.AddForce = ApplyForce;
                 gn.SetTargetLocation = SetTargetLocation;
                 gravGrid[i, j] = gn;
@@ -141,7 +136,12 @@ public class GravGridBuilder : MonoBehaviour
         ResetConnections();
     }
 
-    internal void SetRange(float min, float max)
+    internal void SetLineWidthScalar(float newScale)
+    {
+        lineWidthScalar = newScale;
+    }
+
+    internal void SetScaleRange(float min, float max)
     {
         m_GravMesh.SetRange(min, max);
     }
@@ -209,6 +209,8 @@ public class GravGridBuilder : MonoBehaviour
             drawables = new NativeArray<bool>(connections.Count, Allocator.Persistent);
         if (!lineWidths.IsCreated)
             lineWidths = new NativeArray<float>(connections.Count, Allocator.Persistent);
+        if (!baseLineWidths.IsCreated)
+            baseLineWidths = new NativeArray<float>(connections.Count, Allocator.Persistent);
 
 
         s_ConstructuMesh.Begin();
@@ -224,6 +226,7 @@ public class GravGridBuilder : MonoBehaviour
             gn1VertexStartIndices[j] = connections[j].m_GravNode1VertexStart;
             gn2VertexStartIndices[j] = connections[j].m_GravNode2VertexStart;
             lineWidths[j] = connections[j].m_Thickness;
+            baseLineWidths[j] = connections[j].m_Thickness;
         }
         s_SetConnectionProperties.End();
 
@@ -666,6 +669,14 @@ public class GravGridBuilder : MonoBehaviour
             updateJobHandle.Complete();
             s_UpdateJobs.End();
 
+            var updateLineWidths = new Link.UpdateLineThickness()
+            {
+                lineWidthScalar = lineWidthScalar,
+                baseWidth = baseLineWidths,
+                lineWidths = lineWidths
+            };
+            updateLineWidths.Schedule(connections.Count, 128).Complete();
+
             s_UpdateMeshVerticies.Begin();
             var updateMeshVertices = new Link.UpdateMeshVertices()
             {
@@ -712,6 +723,7 @@ public class GravGridBuilder : MonoBehaviour
         gn1VertexStartIndices.Dispose();
         gn2VertexStartIndices.Dispose();
         lineWidths.Dispose();
+        baseLineWidths.Dispose();
 
         drawables.Dispose();
 
@@ -722,5 +734,6 @@ public class GravGridBuilder : MonoBehaviour
         targetPositions.Dispose();
         moveables.Dispose();
         m_GravMesh.vertices.Dispose();
+       
     }
 }

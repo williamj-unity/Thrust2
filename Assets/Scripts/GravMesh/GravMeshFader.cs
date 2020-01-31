@@ -15,7 +15,7 @@ public class GravMeshFader : MonoBehaviour
             min = max - 1.0f;
 
         grid = GetComponent<GravGridBuilder>();
-        grid.SetRange(min, max);
+        grid.SetScaleRange(min, max);
     }
 
     // Update is called once per frame

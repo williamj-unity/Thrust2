@@ -40,7 +40,7 @@ public class GravNode
 
     public List<Link> m_Links;
 
-    public GravNode(float3 position, float spacing, int index, Transform anchorParent, int vertexStart)
+    public GravNode(float3 position, float spacing, int index, Transform anchorParent, int vertexStart, int layer)
     {
         m_Links = new List<Link>();
         m_Position = position;
@@ -51,6 +51,7 @@ public class GravNode
         m_Index = index;
         m_Moveable = true;
         gravNodeColliderParent = new GameObject("GravNodeAnchor").AddComponent<GravNodeCollider>();
+        gravNodeColliderParent.gameObject.layer = layer;
         gravNodeColliderParent.SetSpacing(spacing/2);
         gravNodeColliderParent.affectorCollisionEnter += AffectorCollisionEnter;
         gravNodeColliderParent.affectorCollisionExit += AffectorCollisionExit;

@@ -82,6 +82,22 @@ public class Link
     }
 
     [BurstCompile]
+    public struct UpdateLineThickness : IJobParallelFor
+    {
+        [ReadOnly]
+        public float lineWidthScalar;
+        [ReadOnly]
+        public NativeArray<float> baseWidth;
+        [WriteOnly]
+        public NativeArray<float> lineWidths;
+
+        public void Execute(int index)
+        {
+            lineWidths[index] = baseWidth[index] * lineWidthScalar;
+        }
+    }
+
+    [BurstCompile]
     public struct UpdateMeshVertices : IJobParallelFor
     {
         [ReadOnly]

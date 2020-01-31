@@ -80,7 +80,7 @@ GameObject:
   - component: {fileID: 875701492374500224}
   - component: {fileID: 875701492374500239}
   - component: {fileID: 696443911790224555}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: GravNodeAffector
   m_TagString: Untagged
   m_Icon: {fileID: 0}

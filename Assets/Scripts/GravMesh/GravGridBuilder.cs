@@ -550,12 +550,11 @@ public class GravGridBuilder : MonoBehaviour
     public void AddAndSetupConnectionAtNextIndex(GravNode gn1, GravNode gn2, bool draw, GravMesh gravMesh)
     {
         if (availableConnectionIndex.Count == 0)
-            Debug.LogError("There are no available slots for a connection is already full");
+            Debug.LogError("There are no available connections.");
         s_CreateNewLink.Begin();
         int index = availableConnectionIndex.Dequeue();
         //We're not going to update the thickness data as to preserve the sector location.
-        Link l = new Link(gn1, gn2, draw, gravMesh, 0, index);
-        connections[index] = l;
+        connections[index].MakeLink(gn1, gn2, draw, gravMesh, 0);
         s_CreateNewLink.End();
 
         gn1Index[index] = connections[index].m_GravNode1PosIndex;
@@ -596,7 +595,6 @@ public class GravGridBuilder : MonoBehaviour
         s_RemoveLinkCreateIP.End();
 
         connections[indexResult].BreakLink(m_GravMesh);
-        connections[indexResult] = null;
         availableConnectionIndex.Enqueue(indexResult);
     }
 

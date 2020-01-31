@@ -27,6 +27,11 @@ public class Link
     public Link(GravNode gn1, GravNode gn2, bool draw, GravMesh gravMesh, float thickness, int index)
     {
         m_Index = index;
+        MakeLink(gn1, gn2, draw, gravMesh, thickness);
+    }
+
+    internal void MakeLink(GravNode gn1, GravNode gn2, bool draw, GravMesh gravMesh, float thickness)
+    {
         m_Gn1 = gn1;
         m_Gn2 = gn2;
         m_GravNode1PosIndex = gn1.m_Index;

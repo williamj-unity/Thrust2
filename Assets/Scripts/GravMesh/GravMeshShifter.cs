@@ -33,22 +33,22 @@ public class GravMeshShifter : MonoBehaviour
 
         if(dir.x > radius/2.0f)
         {
-            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Right, 1);
+            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Right);
         }
 
         if (dir.y > radius / 2.0f)
         {
-            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Up, 1);
+            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Up);
         }
 
         if (dir.x < -radius / 2.0f)
         {
-            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Left, 1);
+            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Left);
         }
 
         if (dir.y < -radius / 2.0f)
         {
-            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Down, 1);
+            gravGrid.ShiftGrid(GravGridBuilder.GridShiftDirection.Down);
         }
     }
 }

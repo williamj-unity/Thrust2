@@ -34,6 +34,7 @@ public class GravNode
     public List<float> stiffnessesList;
 
     public Action<float3, int> SetTargetLocation;
+    public Action<int> Return;
     public Action<float3, int> AddForce;
     public int m_VertexStart;
     public Queue<int> availibleVertexPositions;
@@ -53,11 +54,13 @@ public class GravNode
         gravNodeColliderParent = new GameObject("GravNodeAnchor").AddComponent<GravNodeCollider>();
         gravNodeColliderParent.gameObject.layer = layer;
         gravNodeColliderParent.SetSpacing(spacing/2);
+        gravNodeColliderParent.SetMoveable(true);
         gravNodeColliderParent.affectorCollisionEnter += AffectorCollisionEnter;
         gravNodeColliderParent.affectorCollisionExit += AffectorCollisionExit;
         gravNodeColliderParent.transform.parent = anchorParent;
         gravNodeColliderParent.transform.localPosition = position;
         neighborIndiciesList = new List<int>();
+
         stiffnessesList = new List<float>();
         restDistancesList = new List<float>();
         m_Connections = 0;
@@ -82,6 +85,16 @@ public class GravNode
         return -1;
     }
 
+    public void SetRootPos(Vector3 position)
+    {
+        gravNodeColliderParent.transform.localPosition = position;
+    }
+
+    public Vector3 GetRootPos()
+    {
+        return gravNodeColliderParent.transform.localPosition;
+    }
+
     public void SetHomePosition(Vector3 position)
     {
         m_Position = position;
@@ -89,11 +102,12 @@ public class GravNode
         m_TargetPosition = m_Position;
         m_StartPosition = m_Position;
         m_Acceleration = float3(0, 0, 0);
-        gravNodeColliderParent.transform.localPosition = position;
     }
 
     void AffectorCollisionEnter(float mass)
     {
+        if (!m_Moveable)
+            return;
         Vector3 newPose = m_StartPosition;
         newPose.z = mass;
         SetTargetPosition(newPose);
@@ -101,7 +115,13 @@ public class GravNode
 
     void AffectorCollisionExit()
     {
-        SetTargetPosition(m_StartPosition);
+        Return(m_Index);
+    }
+
+    public void SetMoveable(bool b)
+    {
+        m_Moveable = b;
+        gravNodeColliderParent.SetMoveable(b);
     }
 
     void SetTargetPosition(float3 position)
@@ -126,17 +146,13 @@ public class GravNode
         public NativeArray<float3> targetPositions;
         [ReadOnly]
         public NativeArray<float3> accelerations;
-        [ReadOnly]
-        public NativeArray<bool> moveable;
 
         public NativeArray<float3> positions;
         public NativeArray<float3> prevPositions;
 
         public void Execute(int index)
         {
-            float3 acceleration = 0;
-            if (moveable[index])
-                acceleration = accelerations[index] + (targetPositions[index] - positions[index]);
+            float3 acceleration = accelerations[index] + (targetPositions[index] - positions[index]);
 
             float timeStepSq = timeStep * timeStep;
 

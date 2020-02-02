@@ -36,8 +36,8 @@ public class Link
         m_Gn2 = gn2;
         m_GravNode1PosIndex = gn1.m_Index;
         m_GravNode2PosIndex = gn2.m_Index;
-        m_RestDistance = Vector3.Distance(gn1.m_StartPosition,
-            gn2.m_StartPosition);
+        m_RestDistance = Vector3.Distance(gn1.GetRootPos(),
+            gn2.GetRootPos());
 
         gn1.m_Links.Add(this);
 

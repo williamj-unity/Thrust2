@@ -58,6 +58,9 @@ public class GravGridBuilder : MonoBehaviour
     NativeArray<float> allRestsDistances;
 
     NativeArray<float3> targetPositions;
+    NativeArray<float3> returnPositions;
+    NativeArray<bool> affected;
+
     NativeArray<float3> prevPositions;
     NativeArray<float3> positions;
     NativeArray<float3> newPositions;
@@ -79,12 +82,19 @@ public class GravGridBuilder : MonoBehaviour
     Camera gravGridCam;
 
     int MAX_CONNECTIONS = 16;
-    int mStartX = 0;
-    int mStartY = 0;
+    int mStartWorldX = 0;
+    int mStartWorldY = 0;
+    int sectorStartX = 0;
+    int sectorStartY = 0;
 
     bool needsConnectionReset = false;
 
     private float lineWidthScalar = 1.0f;
+    private Vector3 m_CurrentMeshNormal;
+    private Vector3 m_CurrentMeshBasePose;
+
+    float rootZPos;
+    Vector3 rootAxis;  
 
     void Start()
     {
@@ -95,6 +105,7 @@ public class GravGridBuilder : MonoBehaviour
         int index = 0;
         float meshShaderRadius = mHorizontalParticles * spacing;
         m_GravMesh = new GravMesh(meshShaderRadius, GetComponent<MeshFilter>());
+        rootZPos = 0;
 
         availableConnectionIndex = new Queue<int>();
 
@@ -107,6 +118,7 @@ public class GravGridBuilder : MonoBehaviour
                 var gn = new GravNode(position, spacing, index++, transform, vertexStartIndex, gameObject.layer);
                 gn.AddForce = ApplyForce;
                 gn.SetTargetLocation = SetTargetLocation;
+                gn.Return = SetTargetToReturnPosition;
                 gravGrid[i, j] = gn;
                 gravNodes.Add(gn);
             }
@@ -118,6 +130,8 @@ public class GravGridBuilder : MonoBehaviour
         allRestsDistances = new NativeArray<float>(gravNodes.Count * MAX_CONNECTIONS, Allocator.Persistent);
 
         targetPositions = new NativeArray<float3>(gravNodes.Count, Allocator.Persistent);
+        returnPositions = new NativeArray<float3>(gravNodes.Count, Allocator.Persistent);
+        affected = new NativeArray<bool>(gravNodes.Count, Allocator.Persistent);
         prevPositions = new NativeArray<float3>(gravNodes.Count, Allocator.Persistent);
         positions = new NativeArray<float3>(gravNodes.Count, Allocator.Persistent);
         newPositions = new NativeArray<float3>(gravNodes.Count, Allocator.Persistent);
@@ -129,6 +143,8 @@ public class GravGridBuilder : MonoBehaviour
             accelerations[j] = gravNodes[j].m_Acceleration;
             prevPositions[j] = gravNodes[j].m_PrevPosition;
             targetPositions[j] = gravNodes[j].m_TargetPosition;
+            returnPositions[j] = gravNodes[j].m_StartPosition;
+            affected[j] = false;
             moveables[j] = gravNodes[j].m_Moveable;
             positions[j] = gravNodes[j].m_Position;
         }
@@ -136,7 +152,44 @@ public class GravGridBuilder : MonoBehaviour
         ResetConnections();
     }
 
-    internal void SetLineWidthScalar(float newScale)
+    internal void ArrangeAroundNormal(Transform t)
+    {
+        Vector3 root = gravGrid[0, 0].m_StartPosition;
+        rootZPos = t.position.z;
+        root.z = rootZPos;
+        gravGrid[0, 0].m_StartPosition.z = 0;
+
+
+        for (int i = 0; i < mHorizontalParticles; i++)
+        {
+            int xOffset = (i + mStartWorldX) - sectorStartX;
+            int x = mod(mStartWorldX + i, mHorizontalParticles);
+
+            for (int j = 0; j < mVerticalParticles; j++)
+            {
+                int yOffset = (j + mStartWorldY) - sectorStartY;
+                int y = mod(mStartWorldY + j, mVerticalParticles);
+
+                GravNode gn = gravGrid[x, y];
+                Vector3 offSetPos = new Vector3(xOffset * spacing, yOffset * spacing, 0.0f);
+                int index = gn.m_Index;
+                offSetPos = offSetPos + root;
+                gn.m_StartPosition = offSetPos;
+                returnPositions[index] = offSetPos;
+                if (!affected[index])
+                    targetPositions[index] = offSetPos;
+                if (!moveables[index])
+                {
+                    positions[index] = offSetPos;
+                    prevPositions[index] = offSetPos;
+                    targetPositions[index] = offSetPos;
+                    positions[index] = offSetPos;
+                }
+            }
+        }
+    }
+
+internal void SetLineWidthScalar(float newScale)
     {
         lineWidthScalar = newScale;
     }
@@ -169,13 +222,13 @@ public class GravGridBuilder : MonoBehaviour
         {
             for (int j = 0; j < mVerticalParticles; j++)
             {
-                int x = mod((mStartX + i), mHorizontalParticles);
-                int y = mod((mStartY + j), mVerticalParticles);
+                int x = mod((mStartWorldX + i), mHorizontalParticles);
+                int y = mod((mStartWorldY + j), mVerticalParticles);
                 float thickcessX = lineWidth;
                 float thickcessY = lineWidth;
-                if (y == mStartY)
+                if (y == mStartWorldY)
                     thickcessX *= 3;
-                if (x == mStartX)
+                if (x == mStartWorldX)
                     thickcessY *= 3;
 
                 if (i < mHorizontalParticles - 1) AddConnection(gravGrid[x, y], gravGrid[mod((x + 1), mHorizontalParticles), y],  true, thickcessX, m_GravMesh);
@@ -188,11 +241,8 @@ public class GravGridBuilder : MonoBehaviour
                 //if (x < mHorizontalParticles - 2 && y < mVerticalParticles - 2) AddConnection(gravGrid[x, y], gravGrid[x + 2, y + 2], drawDiagonals, planeLinkStiffness, m_GravMesh);
                 //if (x < mHorizontalParticles - 2 && y < mVerticalParticles - 2) AddConnection(gravGrid[x + 2, y], gravGrid[x, y + 2], drawDiagonals, planeLinkStiffness, m_GravMesh);
 
-                if (x == mStartX) gravGrid[x, y].m_Moveable = false;
-                else if (y == mStartY) gravGrid[x, y].m_Moveable = false;
-                else if (x == mStartX + mHorizontalParticles - 1) gravGrid[x, y].m_Moveable = false;
-                else if (y == mStartY + mVerticalParticles - 1) gravGrid[x, y].m_Moveable = false;
-                else gravGrid[x, y].m_Moveable = true;
+                if (x == mStartWorldX || y == mStartWorldY || x == mStartWorldX + mHorizontalParticles - 1 || y == mStartWorldY + mVerticalParticles - 1) gravGrid[x, y].SetMoveable(false);
+                else gravGrid[x, y].SetMoveable(true);
             }
         }
         s_AddConnections.End();
@@ -264,6 +314,13 @@ public class GravGridBuilder : MonoBehaviour
     void SetTargetLocation(float3 target, int index)
     {
         targetPositions[index] = target;
+        affected[index] = true;
+    }
+
+    void SetTargetToReturnPosition(int index)
+    {
+        targetPositions[index] = returnPositions[index];
+        affected[index] = false;
     }
 
     void ApplyForce(float3 force, int index)
@@ -280,262 +337,154 @@ public class GravGridBuilder : MonoBehaviour
         Right
     }
 
-    public void ShiftGrid(GridShiftDirection gridShiftDirection, int steps)
+    public void ShiftGrid(GridShiftDirection gridShiftDirection)
     {
-        if (steps == 0)
-            return;
+        Vector3 root = gravGrid[0, 0].m_StartPosition;
+
         switch (gridShiftDirection)
         {
             case GridShiftDirection.Right:
                 {
-                    if(steps > mHorizontalParticles)
-                    {
-                        steps = mHorizontalParticles - 1;
-                    }
-                    int newStart = mStartX + steps;
-                    int currentEndIndex = mod(mStartX + mHorizontalParticles - 1, mHorizontalParticles);
+                    int newStart = mStartWorldX + 1;
+                    int oldEnd = mod(mStartWorldX + mHorizontalParticles - 1, mHorizontalParticles);
+                    int newStartX = mod(newStart, mHorizontalParticles);
+                    int oldStart = mod(mStartWorldX, mHorizontalParticles);
+                    int newWorldXPos = mStartWorldX + mHorizontalParticles;
+
+                    if (oldStart == 0)
+                        sectorStartX += mHorizontalParticles;
+
                     for (int j = 0; j < mVerticalParticles; j++)
                     {
-                        int y = mod((mStartY + j), mVerticalParticles);
-
-                        int currX = 0;
-                        int startStep = mod(mStartX, mHorizontalParticles);
                         s_SetConnectionProperties.Begin();
-                        for (int i = 0; i < steps; i++)
-                        {
-                            currX = mod(i + mStartX, mHorizontalParticles);
-                            Vector3 newPos = new Vector3(((i + mStartX) + mHorizontalParticles) * spacing, (mStartY + j) * spacing, 0.0f);
-                            gravGrid[currX, y].SetHomePosition(newPos);
-                            int index = gravGrid[currX, y].m_Index;
-                            accelerations[index] = newPos;
-                            prevPositions[index] = newPos;
-                            targetPositions[index] = newPos;
-                            positions[index] = newPos;
-                            if (y != mStartY && y != mStartY + mVerticalParticles - 1)
-                                moveables[index] = true;
-                        }
+                        int y = mod((mStartWorldY + j), mVerticalParticles);
+
+                        Vector3 rootPos = new Vector3((sectorStartX) * spacing, (sectorStartY) * spacing, rootZPos);
+                        Vector3 colliderRootPos = new Vector3((mStartWorldX + mHorizontalParticles) * spacing, (mStartWorldY + j) * spacing, 0.0f);
+                        Vector3 relativePos = Vector3.zero;
+
+                        int yOffset = j - sectorStartY;
+                        int xOffset = newWorldXPos - sectorStartX;
+
+                        Vector3 offSetPos = new Vector3(xOffset * spacing, yOffset * spacing, 0.0f);
+                        offSetPos = offSetPos + rootPos;
+                        relativePos = offSetPos;
+
+                        ConfigureNewNodePosition(oldStart, y, colliderRootPos, relativePos);
                         s_SetConnectionProperties.End();
 
-                        GravNode newStartGN = gravGrid[mod(newStart, mHorizontalParticles), y];
-                        GravNode oldStartGN = gravGrid[startStep, y];
-                        GravNode newEndGN = gravGrid[currX, y];
-                        GravNode oldEndGN = gravGrid[currentEndIndex, y];
+                        GravNode newStartGN = gravGrid[newStartX, y];
+                        GravNode oldStartNewEndGN = gravGrid[oldStart, y];
+                        GravNode oldEndGN = gravGrid[oldEnd, y];
 
-                        s_AddConnections.Begin();
-                        RemoveConnection(newEndGN, newStartGN);
-                        AddAndSetupConnectionAtNextIndex(oldEndGN, oldStartGN, true,  m_GravMesh);
-                        s_AddConnections.End();
-
-                        s_SetGravNodeConnectionProperties.Begin();
-                        if (y != mStartY && y != mStartY + mVerticalParticles - 1)
-                        {
-                            int oldEndGNIndex = oldEndGN.m_Index;
-                            int oldStartGNIndex = oldStartGN.m_Index;
-                            moveables[oldEndGNIndex] = true;
-                            moveables[oldStartGNIndex] = true;
-                        }
-
-                        int newStartXIndex = newStartGN.m_Index;
-                        prevPositions[newStartXIndex] = newStartGN.m_StartPosition;
-                        targetPositions[newStartXIndex] = newStartGN.m_StartPosition;
-                        positions[newStartXIndex] = newStartGN.m_StartPosition;
-                        moveables[newStartXIndex] = false;
-
-                        int newEndXINdex = newEndGN.m_Index;
-                        prevPositions[newEndXINdex] = newEndGN.m_StartPosition;
-                        targetPositions[newEndXINdex] = newEndGN.m_StartPosition;
-                        positions[newEndXINdex] = newEndGN.m_StartPosition;
-                        moveables[newEndXINdex] = false;
-                        s_SetGravNodeConnectionProperties.End();
+                        ConfigureNewStartAndEndNodes(
+                            oldStartNewEndGN, //break
+                            newStartGN, //break
+                            oldEndGN,   // connect
+                            oldStartNewEndGN, //connect
+                            newStartGN, //start
+                            oldStartNewEndGN, //end
+                            oldEndGN, //middle
+                            y, mStartWorldY, mVerticalParticles);
                     }
-                    mStartX = newStart;
+                    mStartWorldX = newStart;
                     break;
                 }
             case GridShiftDirection.Left:
                 {
-                    if (steps > mHorizontalParticles)
-                    {
-                        steps = mHorizontalParticles - 1;
-                    }
-                    int newStart = mStartX - steps;
-                    int currentEndIndex = mod(mStartX + mHorizontalParticles - 1, mHorizontalParticles);
-                    int newEnd = mod(mStartX - steps + mHorizontalParticles - 1, mHorizontalParticles);
+                    int newStart = mStartWorldX - 1;
+                    int oldStart = mod(mStartWorldX, mHorizontalParticles);
+                    int oldEnd = mod(mStartWorldX + mHorizontalParticles - 1, mHorizontalParticles);
+                    int newEnd = mod(newStart + mHorizontalParticles - 1, mHorizontalParticles);
                     for (int j = 0; j < mVerticalParticles; j++)
                     {
-                        int y = mod((mStartY + j), mVerticalParticles);
+                        int y = mod((mStartWorldY + j), mVerticalParticles);
 
-                        int startStep = mod(mStartX, mHorizontalParticles);
-                        int currX = 0;
-                        for (int i = 1; i <= steps; i++)
-                        {
-                            currX = mod((mStartX - i), mHorizontalParticles);
-                            Vector3 newPos = new Vector3((mStartX - i) * spacing, (mStartY + j) * spacing, 0.0f);
-                            gravGrid[currX, y].SetHomePosition(newPos);
-                            int index = gravGrid[currX, y].m_Index;
-                            accelerations[index] = newPos;
-                            prevPositions[index] = newPos;
-                            targetPositions[index] = newPos;
-                            positions[index] = newPos;
-                            if (y != mStartY && y != mStartY + mVerticalParticles - 1)
-                                moveables[index] = true;
-                        }
-                        GravNode newStartGN = gravGrid[currX, y];
-                        GravNode oldStartGN = gravGrid[startStep, y];
+                        Vector3 rootPos = new Vector3((mStartWorldX - 1) * spacing, (mStartWorldY + j) * spacing, 0.0f);
+                        ConfigureNewNodePosition(oldEnd, y, rootPos, rootPos);
+
+                        GravNode oldStartGN = gravGrid[oldStart, y];
                         GravNode newEndGN = gravGrid[newEnd, y];
-                        GravNode oldEndGN = gravGrid[currentEndIndex, y];
+                        GravNode oldEndNewStartGN = gravGrid[oldEnd, y];
 
-                        s_AddConnections.Begin();
-                        RemoveConnection(newEndGN, newStartGN);
-                        AddAndSetupConnectionAtNextIndex(oldEndGN, oldStartGN, true,  m_GravMesh);
-                        s_AddConnections.End();
 
-                        s_SetGravNodeConnectionProperties.Begin();
-                        if (y != mStartY && y != mStartY + mVerticalParticles - 1)
-                        {
-                            int oldEndGNIndex = oldEndGN.m_Index;
-                            int oldStartGNIndex = oldStartGN.m_Index;
-                            moveables[oldEndGNIndex] = true;
-                            moveables[oldStartGNIndex] = true;
-                        }
-
-                        int newStartXIndex = newStartGN.m_Index;
-                        prevPositions[newStartXIndex] = newStartGN.m_StartPosition;
-                        targetPositions[newStartXIndex] = newStartGN.m_StartPosition;
-                        positions[newStartXIndex] = newStartGN.m_StartPosition;
-                        moveables[newStartXIndex] = false;
-
-                        int newEndXINdex = newEndGN.m_Index;
-                        prevPositions[newEndXINdex] = newEndGN.m_StartPosition;
-                        targetPositions[newEndXINdex] = newEndGN.m_StartPosition;
-                        positions[newEndXINdex] = newEndGN.m_StartPosition;
-                        moveables[newEndXINdex] = false;
-                        s_SetGravNodeConnectionProperties.End();
+                        ConfigureNewStartAndEndNodes(
+                            newEndGN, //break
+                            oldEndNewStartGN, //break
+                            oldEndNewStartGN,   // connect
+                            oldStartGN,  //connect
+                            oldEndNewStartGN, //start
+                            newEndGN, //end
+                            oldStartGN, //middle
+                            y, mStartWorldY, mVerticalParticles);
                     }
-                    mStartX -= steps;
+                    mStartWorldX -= 1;
+                    sectorStartX = mod(sectorStartX + 1, mHorizontalParticles);
+
                     break;
                 }
             case GridShiftDirection.Up:
                 {
-                    if (steps > mVerticalParticles)
-                    {
-                        steps = mVerticalParticles - 1;
-                    }
-                    int currentEndIndex = mod(mStartY + mVerticalParticles - 1, mVerticalParticles);
-                    int newStart = mStartY + steps;
+                    int newStart = mStartWorldY + 1;
+                    int oldEnd = mod(mStartWorldY + mVerticalParticles - 1, mVerticalParticles);
+                    int newStartY = mod(newStart, mVerticalParticles);
+                    int oldStart = mod(mStartWorldY, mVerticalParticles);
+
                     for (int j = 0; j < mHorizontalParticles; j++)
                     {
-                        int x = mod((mStartX + j), mHorizontalParticles);
-                        int startStep = mod(mStartY, mVerticalParticles);
-                        int currY = 0;
-                        for (int i = 0; i < steps; i++)
-                        {
-                            currY = mod(i + mStartY, mVerticalParticles);
-                            Vector3 newPos = new Vector3( (mStartX + j) * spacing, ((i + mStartY) + mVerticalParticles) * spacing, 0.0f);
-                            gravGrid[x, currY].SetHomePosition(newPos);
-                            int index = gravGrid[x, currY].m_Index;
-                            accelerations[index] = newPos;
-                            prevPositions[index] = newPos;
-                            targetPositions[index] = newPos;
-                            positions[index] = newPos;
-                            if (x != mStartY && x != mStartX + mHorizontalParticles - 1)
-                                moveables[index] = true;
-                        }
+                        int x = mod((mStartWorldX + j), mHorizontalParticles);
+                        Vector3 rootPos = new Vector3( (mStartWorldX + j) * spacing, (mStartWorldY + mVerticalParticles) * spacing, 0.0f);
+                        ConfigureNewNodePosition(x, oldStart, rootPos, rootPos);
 
-                        GravNode newStartGN = gravGrid[x, mod(newStart, mHorizontalParticles)];
-                        GravNode oldStartGN = gravGrid[x, startStep];
-                        GravNode newEndGN = gravGrid[x, currY];
-                        GravNode oldEndGN = gravGrid[x, currentEndIndex];
+                        GravNode newStartGN = gravGrid[x, newStartY];
+                        GravNode oldStartNewEndGN = gravGrid[x, oldStart];
+                        GravNode oldEndGN = gravGrid[x, oldEnd];
 
-                        s_AddConnections.Begin();
-                        RemoveConnection(newEndGN, newStartGN);
-                        AddAndSetupConnectionAtNextIndex(oldEndGN, oldStartGN, true,  m_GravMesh);
-                        s_AddConnections.End();
-
-                        s_SetGravNodeConnectionProperties.Begin();
-                        if (x != mStartX && x != mStartX + mHorizontalParticles - 1)
-                        {
-                            int oldEndGNIndex = oldEndGN.m_Index;
-                            int oldStartGNIndex = oldStartGN.m_Index;
-                            moveables[oldEndGNIndex] = true;
-                            moveables[oldStartGNIndex] = true;
-                        }
-
-                        int newStartXIndex = newStartGN.m_Index;
-                        prevPositions[newStartXIndex] = newStartGN.m_StartPosition;
-                        targetPositions[newStartXIndex] = newStartGN.m_StartPosition;
-                        positions[newStartXIndex] = newStartGN.m_StartPosition;
-                        moveables[newStartXIndex] = false;
-
-                        int newEndXINdex = newEndGN.m_Index;
-                        prevPositions[newEndXINdex] = newEndGN.m_StartPosition;
-                        targetPositions[newEndXINdex] = newEndGN.m_StartPosition;
-                        positions[newEndXINdex] = newEndGN.m_StartPosition;
-                        moveables[newEndXINdex] = false;
-                        s_SetGravNodeConnectionProperties.End();
+                        ConfigureNewStartAndEndNodes(
+                            oldStartNewEndGN, //break
+                            newStartGN, //break
+                            oldEndGN,   // connect
+                            oldStartNewEndGN, //connect
+                            newStartGN, //start
+                            oldStartNewEndGN, //end
+                            oldEndGN, //middle
+                            x, mStartWorldX, mHorizontalParticles);
                     }
-                    mStartY = newStart;
+                    mStartWorldY = newStart;
+                    sectorStartY = mod(sectorStartY - 1, mVerticalParticles);
+
                     break;
                 }
             case GridShiftDirection.Down:
                 {
-                    if (steps > mVerticalParticles)
-                    {
-                        steps = mVerticalParticles - 1;
-                    }
-                    int currentEndIndex = mod(mStartY + mVerticalParticles - 1, mVerticalParticles);
-                    int newEnd = mod(mStartY - steps - 1, mVerticalParticles);
+                    int newStart = mStartWorldY - 1;
+                    int oldStart = mod(mStartWorldY, mVerticalParticles);
+                    int oldEnd = mod(mStartWorldY + mVerticalParticles - 1, mVerticalParticles);
+                    int newEnd = mod(newStart + mVerticalParticles - 1, mVerticalParticles);
                     for (int j = 0; j < mHorizontalParticles; j++)
                     {
-                        int x = mod((mStartX + j), mHorizontalParticles);
-                        int currY = 0;
-                        int startStep = mod(mStartY, mVerticalParticles);
+                        int x = mod((mStartWorldX + j), mHorizontalParticles);
+                        Vector3 rootPos = new Vector3((mStartWorldX + j) * spacing, (mStartWorldY - 1) * spacing,  0.0f);
+                        ConfigureNewNodePosition(x, oldEnd, rootPos, rootPos);
 
-                        for (int i = 1; i <= steps; i++)
-                        {
-                            currY = mod((mStartY - i), mVerticalParticles);
-                            Vector3 newPos = new Vector3((mStartX + j) * spacing, (mStartY - i) * spacing,  0.0f);
-                            gravGrid[x, currY].SetHomePosition(newPos);
-                            int index = gravGrid[x, currY].m_Index;
-                            accelerations[index] = newPos;
-                            prevPositions[index] = newPos;
-                            targetPositions[index] = newPos;
-                            positions[index] = newPos;
-                            if (x != mStartX && x != mStartX + mHorizontalParticles - 1)
-                                moveables[index] = true;
-                        }
-                        GravNode newStartGN = gravGrid[x, currY];
-                        GravNode oldStartGN = gravGrid[x,startStep];
+                        GravNode oldStartGN = gravGrid[x, oldStart];
                         GravNode newEndGN = gravGrid[x, newEnd];
-                        GravNode oldEndGN = gravGrid[x, currentEndIndex];
+                        GravNode oldEndNewStartGN = gravGrid[x, oldEnd];
 
-                        s_AddConnections.Begin();
-                        RemoveConnection(newEndGN, newStartGN);
-                        AddAndSetupConnectionAtNextIndex(oldEndGN, oldStartGN, true,  m_GravMesh);
-                        s_AddConnections.End();
 
-                        s_SetGravNodeConnectionProperties.Begin();
-                        if (x != mStartX && x != mStartX + mHorizontalParticles - 1)
-                        {
-                            int oldEndGNIndex = oldEndGN.m_Index;
-                            int oldStartGNIndex = oldStartGN.m_Index;
-                            moveables[oldEndGNIndex] = true;
-                            moveables[oldStartGNIndex] = true;
-                        }
-
-                        int newStartXIndex = newStartGN.m_Index;
-                        prevPositions[newStartXIndex] = newStartGN.m_StartPosition;
-                        targetPositions[newStartXIndex] = newStartGN.m_StartPosition;
-                        positions[newStartXIndex] = newStartGN.m_StartPosition;
-                        moveables[newStartXIndex] = false;
-
-                        int newEndXINdex = newEndGN.m_Index;
-                        prevPositions[newEndXINdex] = newEndGN.m_StartPosition;
-                        targetPositions[newEndXINdex] = newEndGN.m_StartPosition;
-                        positions[newEndXINdex] = newEndGN.m_StartPosition;
-                        moveables[newEndXINdex] = false;
-                        s_SetGravNodeConnectionProperties.End();
+                        ConfigureNewStartAndEndNodes(
+                            newEndGN, //break
+                            oldEndNewStartGN, //break
+                            oldEndNewStartGN,   // connect
+                            oldStartGN,  //connect
+                            oldEndNewStartGN, //start
+                            newEndGN, //end
+                            oldStartGN, //middle
+                            x, mStartWorldX, mHorizontalParticles);
                     }
-                    mStartY -= steps;
+                    mStartWorldY -= 1;
+                    sectorStartY = mod(sectorStartY + 1, mVerticalParticles);
+
                     break;
                 }
             default:
@@ -543,6 +492,58 @@ public class GravGridBuilder : MonoBehaviour
         }
 
         needsConnectionReset = true;
+    }
+
+    public void ConfigureNewNodePosition(int x, int y, Vector3 rootPos, Vector3 relativePos)
+    {
+        GravNode gn = gravGrid[x, y];
+        gn.SetHomePosition(relativePos);
+        gn.SetRootPos(rootPos);
+        int index = gn.m_Index;
+        accelerations[index] = 0;
+        prevPositions[index] = relativePos;
+        targetPositions[index] = relativePos;
+        returnPositions[index] = relativePos;
+        positions[index] = relativePos;
+        affected[index] = false;
+        moveables[index] = false;
+        gn.SetMoveable(false);
+    }
+
+    public void ConfigureNewStartAndEndNodes(
+        GravNode break1, 
+        GravNode break2, 
+        GravNode connect1, 
+        GravNode connect2,
+        GravNode newStart,
+        GravNode newEnd,
+        GravNode newMid,
+        int row, int start, int max)
+    {
+        s_AddConnections.Begin();
+        RemoveConnection(break1, break2);
+        AddAndSetupConnectionAtNextIndex(connect1, connect2, true, m_GravMesh);
+        s_AddConnections.End();
+
+        s_SetGravNodeConnectionProperties.Begin();
+        if (row != start && row != start + max - 1)
+        {
+            int midIndex = newMid.m_Index;
+            newMid.SetMoveable(true);
+            moveables[midIndex] = true;
+        }
+
+        int newStartXIndex = newStart.m_Index;
+        affected[newStartXIndex] = false;
+        moveables[newStartXIndex] = false;
+        newStart.SetMoveable(false);
+
+        int newEndXINdex = newEnd.m_Index;
+        affected[newEndXINdex] = false;
+        moveables[newEndXINdex] = false;
+        newEnd.SetMoveable(false);
+
+        s_SetGravNodeConnectionProperties.End();
     }
 
     static ProfilerMarker s_RemoveLinkCreateIP = new ProfilerMarker("RemoveLinkeCreateIP");
@@ -600,10 +601,9 @@ public class GravGridBuilder : MonoBehaviour
 
     public Vector3 GetMeshCenterWorld()
     {
-        Vector3 localMeshMiddle = new Vector3(mStartX * spacing +  (mHorizontalParticles * spacing) / 2.0f, mStartY * spacing + (mVerticalParticles * spacing) / 2.0f, 0.0f);
+        Vector3 localMeshMiddle = new Vector3(mStartWorldX * spacing +  (mHorizontalParticles * spacing) / 2.0f, mStartWorldY * spacing + (mVerticalParticles * spacing) / 2.0f, 0.0f);
         return transform.position + localMeshMiddle;
     }
-
 
     int mod(int x, int m)
     {
@@ -660,8 +660,7 @@ public class GravGridBuilder : MonoBehaviour
                 positions = positions,
                 accelerations = accelerations,
                 prevPositions = prevPositions,
-                targetPositions = targetPositions,
-                moveable = moveables
+                targetPositions = targetPositions
             };
             JobHandle updateJobHandle = updateJobData.Schedule(gravNodes.Count, 128);
             updateJobHandle.Complete();
@@ -695,7 +694,6 @@ public class GravGridBuilder : MonoBehaviour
             s_UpdateMeshVerticies.End();
         }
 
-
         s_ResetAccelerations.Begin();
         var resetAccelerations = new GravNode.ResetAcclerations
         {
@@ -728,8 +726,10 @@ public class GravGridBuilder : MonoBehaviour
         prevPositions.Dispose();
         positions.Dispose();
         newPositions.Dispose();
+        affected.Dispose();
         accelerations.Dispose();
         targetPositions.Dispose();
+        returnPositions.Dispose();
         moveables.Dispose();
         m_GravMesh.vertices.Dispose();
        

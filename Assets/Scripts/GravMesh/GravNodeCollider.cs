@@ -12,6 +12,7 @@ public class GravNodeCollider : MonoBehaviour
 
     private float maxAffectorMass = Single.NegativeInfinity;
     private float m_Spacing = 1.0f;
+    bool m_Moveable = false;
 
     SortedSet<GravNodeAffector> collidedGravNodeAffectors = new SortedSet<GravNodeAffector>(new GravAffectorComparer());
     void Start()
@@ -25,11 +26,19 @@ public class GravNodeCollider : MonoBehaviour
         m_Spacing = spacing;
     }
 
+
+    public void SetMoveable(bool b)
+    {
+        m_Moveable = b;
+    }
+
     private void OnTriggerEnter(Collider other)
     {
         GravNodeAffector affectorOut;
         if (other.TryGetComponent<GravNodeAffector>(out affectorOut))
         {
+            if (!m_Moveable)
+                return;
             if (!collidedGravNodeAffectors.Contains(affectorOut))
                 collidedGravNodeAffectors.Add(affectorOut);
             //else
@@ -44,8 +53,13 @@ public class GravNodeCollider : MonoBehaviour
         GravNodeAffector affectorOut;
         if (other.TryGetComponent<GravNodeAffector>(out affectorOut) )
         {
-            if(collidedGravNodeAffectors.Contains(affectorOut))
+            if (!m_Moveable)
+                return;
+
+            if (collidedGravNodeAffectors.Contains(affectorOut))
                 collidedGravNodeAffectors.Remove(affectorOut);
+            else
+                return;
 
             if (collidedGravNodeAffectors.Count > 0)
                 affectorCollisionEnter(collidedGravNodeAffectors.Max.mass);

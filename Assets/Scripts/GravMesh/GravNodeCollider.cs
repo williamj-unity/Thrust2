@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Mathematics;
 using UnityEngine;
 
 public class GravNodeCollider : MonoBehaviour
@@ -8,6 +9,8 @@ public class GravNodeCollider : MonoBehaviour
     public Action<float> affectorCollisionEnter;
 
     public Action affectorCollisionExit;
+
+    public Func<Matrix4x4> GetNodeTransformFunc;
     // Start is called before the first frame update
 
     private float maxAffectorMass = Single.NegativeInfinity;
@@ -26,10 +29,19 @@ public class GravNodeCollider : MonoBehaviour
         m_Spacing = spacing;
     }
 
-
     public void SetMoveable(bool b)
     {
         m_Moveable = b;
+        if (!b)
+        {
+            collidedGravNodeAffectors.Clear();
+            affectorCollisionExit();
+        }
+    }
+
+    public Matrix4x4 GetNodeTransform()
+    {
+        return GetNodeTransformFunc.Invoke();
     }
 
     private void OnTriggerEnter(Collider other)

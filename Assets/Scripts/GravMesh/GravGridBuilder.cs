@@ -90,11 +90,9 @@ public class GravGridBuilder : MonoBehaviour
     bool needsConnectionReset = false;
 
     private float lineWidthScalar = 1.0f;
-    private Vector3 m_CurrentMeshNormal;
-    private Vector3 m_CurrentMeshBasePose;
 
-    float rootZPos;
-    Vector3 rootAxis;  
+    Matrix4x4 rootTransform;
+    public LayerMask parentLayer;
 
     void Start()
     {
@@ -105,7 +103,8 @@ public class GravGridBuilder : MonoBehaviour
         int index = 0;
         float meshShaderRadius = mHorizontalParticles * spacing;
         m_GravMesh = new GravMesh(meshShaderRadius, GetComponent<MeshFilter>());
-        rootZPos = 0;
+        rootTransform = new Matrix4x4();
+        rootTransform.SetTRS(Vector3.zero, Quaternion.identity, Vector3.one);
 
         availableConnectionIndex = new Queue<int>();
 
@@ -119,6 +118,7 @@ public class GravGridBuilder : MonoBehaviour
                 gn.AddForce = ApplyForce;
                 gn.SetTargetLocation = SetTargetLocation;
                 gn.Return = SetTargetToReturnPosition;
+                gn.GetNodeTransform = GetNodeTransform;
                 gravGrid[i, j] = gn;
                 gravNodes.Add(gn);
             }
@@ -152,14 +152,8 @@ public class GravGridBuilder : MonoBehaviour
         ResetConnections();
     }
 
-    internal void ArrangeAroundNormal(Transform t)
+    internal void ArrangeAroundNormal(Matrix4x4 matrix)
     {
-        Vector3 root = gravGrid[0, 0].m_StartPosition;
-        rootZPos = t.position.z;
-        root.z = rootZPos;
-        gravGrid[0, 0].m_StartPosition.z = 0;
-
-
         for (int i = 0; i < mHorizontalParticles; i++)
         {
             int xOffset = (i + mStartWorldX) - sectorStartX;
@@ -171,25 +165,19 @@ public class GravGridBuilder : MonoBehaviour
                 int y = mod(mStartWorldY + j, mVerticalParticles);
 
                 GravNode gn = gravGrid[x, y];
-                Vector3 offSetPos = new Vector3(xOffset * spacing, yOffset * spacing, 0.0f);
+                Vector4 localPosition = new Vector4(xOffset * spacing, yOffset * spacing, 0.0f, 1.0f);
                 int index = gn.m_Index;
-                offSetPos = offSetPos + root;
-                gn.m_StartPosition = offSetPos;
-                returnPositions[index] = offSetPos;
+                localPosition = matrix * localPosition;
+                Vector3 pose = new Vector3(localPosition.x, localPosition.y, localPosition.z);
+                gn.m_StartPosition = pose;
+                returnPositions[index] = pose;
                 if (!affected[index])
-                    targetPositions[index] = offSetPos;
-                if (!moveables[index])
-                {
-                    positions[index] = offSetPos;
-                    prevPositions[index] = offSetPos;
-                    targetPositions[index] = offSetPos;
-                    positions[index] = offSetPos;
-                }
+                    targetPositions[index] = pose;
             }
         }
     }
 
-internal void SetLineWidthScalar(float newScale)
+    internal void SetLineWidthScalar(float newScale)
     {
         lineWidthScalar = newScale;
     }
@@ -231,8 +219,8 @@ internal void SetLineWidthScalar(float newScale)
                 if (x == mStartWorldX)
                     thickcessY *= 3;
 
-                if (i < mHorizontalParticles - 1) AddConnection(gravGrid[x, y], gravGrid[mod((x + 1), mHorizontalParticles), y],  true, thickcessX, m_GravMesh);
-                if(j < mVerticalParticles - 1) AddConnection(gravGrid[x, y], gravGrid[x, mod((y + 1), mVerticalParticles)], true, thickcessY, m_GravMesh);
+                if (i < mHorizontalParticles - 1) AddConnection(gravGrid[x, y], gravGrid[mod((x + 1), mHorizontalParticles), y],  true, thickcessX, m_GravMesh, Link.Dir.Right);
+                if(j < mVerticalParticles - 1) AddConnection(gravGrid[x, y], gravGrid[x, mod((y + 1), mVerticalParticles)], true, thickcessY, m_GravMesh, Link.Dir.Up);
                 //if (x < mHorizontalParticles - 1 && y < mVerticalParticles - 1) AddConnection(gravGrid[x, y], gravGrid[x + 1, y + 1], drawDiagonals, planeLinkStiffness, m_GravMesh);
                 //if (x < mHorizontalParticles - 1 && y < mVerticalParticles - 1) AddConnection(gravGrid[x + 1, y], gravGrid[x, y + 1], drawDiagonals, planeLinkStiffness, m_GravMesh);
                 //configure extended connections
@@ -302,14 +290,62 @@ internal void SetLineWidthScalar(float newScale)
         needsConnectionReset = false;
     }
 
-    public void AddConnection(GravNode gn1, GravNode gn2, bool draw, float thickness,  GravMesh gravMesh)
+    public void AddConnection(GravNode gn1, GravNode gn2, bool draw, float thickness, GravMesh gravMesh, Link.Dir dir)
     {
-        Link l = new Link(gn1, gn2, draw, gravMesh, thickness, connections.Count);
+        Link l = new Link(gn1, gn2, draw, gravMesh, thickness, connections.Count, dir, spacing);
         connections.Add(l);
     }
 
     static ProfilerMarker s_CreateNewLink = new ProfilerMarker("CreateNewLink");
 
+   
+    Matrix4x4 GetNodeTransform(int index, List<Link.Dir> dirs, List<int> indicies)
+    {
+        Matrix4x4 m = new Matrix4x4();
+        int normals = 0;
+        float3 normal = Vector3.zero;
+
+        //Average the normal of the node based on neighboring particle positions
+        int rightIndexOf = dirs.IndexOf(Link.Dir.Right);
+        int upIndexOf = dirs.IndexOf(Link.Dir.Up);
+        if(rightIndexOf != -1 && upIndexOf != -1)
+        {
+            float3 dir = math.cross(positions[indicies[rightIndexOf]] - positions[index], positions[indicies[upIndexOf]] - positions[index]);
+            normal = math.normalize(dir);
+            normals++;
+        }
+
+        int downIndexOf = dirs.IndexOf(Link.Dir.Down);
+        int leftIndexOf = dirs.IndexOf(Link.Dir.Left);
+        if (downIndexOf != -1 && leftIndexOf != -1)
+        {
+            float3 dir = math.cross(positions[indicies[leftIndexOf]] - positions[index], positions[indicies[downIndexOf]] - positions[index]);
+            normal += math.normalize(dir);
+            normals++;
+        }
+
+        if (normals != 0)
+            normal = normal * 1.0f / normals;
+        else
+            normal = Vector3.up;
+
+        float3 pos = positions[index];
+        m.SetTRS(pos + new float3(transform.position), Quaternion.FromToRotation(Vector3.forward, normal), Vector3.one);
+
+        normalGizmos = normal;
+        positionGizmos = positions[index] + new float3(transform.position);
+
+        return m;
+    }
+
+    Vector3 positionGizmos;
+    Vector3 normalGizmos;
+
+    void OnDrawGizmosSelected()
+    {
+        Gizmos.DrawSphere(positionGizmos, 0.2f);
+        Gizmos.DrawRay(positionGizmos, normalGizmos);
+    }
 
     void SetTargetLocation(float3 target, int index)
     {
@@ -337,10 +373,29 @@ internal void SetLineWidthScalar(float newScale)
         Right
     }
 
+    public Matrix4x4 GetClosestParentNode()
+    {
+        Vector3 rootPos = new Vector3(sectorStartX * spacing, sectorStartY * spacing, 0.0f);
+        Vector3 rayCastPos = rootPos + transform.position;
+        Matrix4x4 m = new Matrix4x4();
+        m.SetTRS(rootPos, Quaternion.identity, Vector3.one);
+        if (parentLayer.value == 0)
+            return m;
+        int numHits = Physics.OverlapSphereNonAlloc(rayCastPos, spacing / 2.0f, hits, parentLayer.value, QueryTriggerInteraction.Collide);
+        if (numHits == 1)
+        {
+            if (hits[0].TryGetComponent<GravNodeCollider>(out var collider))
+            {
+                m = collider.GetNodeTransformFunc();
+                m = transform.worldToLocalMatrix * m;
+            }
+        }
+        return m;
+    }
+    Collider[] hits = new Collider[1];
+
     public void ShiftGrid(GridShiftDirection gridShiftDirection)
     {
-        Vector3 root = gravGrid[0, 0].m_StartPosition;
-
         switch (gridShiftDirection)
         {
             case GridShiftDirection.Right:
@@ -351,26 +406,30 @@ internal void SetLineWidthScalar(float newScale)
                     int oldStart = mod(mStartWorldX, mHorizontalParticles);
                     int newWorldXPos = mStartWorldX + mHorizontalParticles;
 
-                    if (oldStart == 0)
+                    bool sectorShift = false;
+                    if (oldStart == 0) // sector is moving!!
+                    {
                         sectorStartX += mHorizontalParticles;
+                        rootTransform = GetClosestParentNode();
+                        sectorShift = true;
+                    }
 
                     for (int j = 0; j < mVerticalParticles; j++)
                     {
                         s_SetConnectionProperties.Begin();
                         int y = mod((mStartWorldY + j), mVerticalParticles);
 
-                        Vector3 rootPos = new Vector3((sectorStartX) * spacing, (sectorStartY) * spacing, rootZPos);
-                        Vector3 colliderRootPos = new Vector3((mStartWorldX + mHorizontalParticles) * spacing, (mStartWorldY + j) * spacing, 0.0f);
-                        Vector3 relativePos = Vector3.zero;
-
-                        int yOffset = j - sectorStartY;
+                        int yOffset = (j + mStartWorldY) - sectorStartY;
                         int xOffset = newWorldXPos - sectorStartX;
 
-                        Vector3 offSetPos = new Vector3(xOffset * spacing, yOffset * spacing, 0.0f);
-                        offSetPos = offSetPos + rootPos;
-                        relativePos = offSetPos;
+                        Vector3 colliderRootPos = new Vector3((newWorldXPos) * spacing, (mStartWorldY + j) * spacing, 0.0f);
+                        Vector4 localPosition = new Vector4(xOffset * spacing, yOffset * spacing, 0.0f, 1.0f);
 
-                        ConfigureNewNodePosition(oldStart, y, colliderRootPos, relativePos);
+                        localPosition = rootTransform * localPosition;
+                        colliderRootPos = transform.localToWorldMatrix * localPosition;
+                        colliderRootPos.z = 0;
+
+                        ConfigureNewNodePosition(oldStart, y, colliderRootPos, localPosition);
                         s_SetConnectionProperties.End();
 
                         GravNode newStartGN = gravGrid[newStartX, y];
@@ -385,9 +444,62 @@ internal void SetLineWidthScalar(float newScale)
                             newStartGN, //start
                             oldStartNewEndGN, //end
                             oldEndGN, //middle
-                            y, mStartWorldY, mVerticalParticles);
+                            y, mStartWorldY, mVerticalParticles, Link.Dir.Right);
                     }
                     mStartWorldX = newStart;
+                    if(sectorShift)
+                        ArrangeAroundNormal(rootTransform);
+                    break;
+                }
+
+            case GridShiftDirection.Up:
+                {
+                    int newStart = mStartWorldY + 1;
+                    int oldEnd = mod(mStartWorldY + mVerticalParticles - 1, mVerticalParticles);
+                    int newStartY = mod(newStart, mVerticalParticles);
+                    int oldStart = mod(mStartWorldY, mVerticalParticles);
+                    int newWorldYPos = mStartWorldY + mVerticalParticles;
+
+                    bool sectorShift = false;
+                    if(oldStart == 0)
+                    {
+                        sectorStartY += mVerticalParticles;
+                        rootTransform = GetClosestParentNode();
+                        sectorShift = true;
+                    }
+
+                    for (int j = 0; j < mHorizontalParticles; j++)
+                    {
+                        int x = mod((mStartWorldX + j), mHorizontalParticles);
+
+                        int yOffset = newWorldYPos - sectorStartY;
+                        int xOffset = (j + mStartWorldX) - sectorStartX;
+
+                        Vector3 colliderRootPos = new Vector3((mStartWorldX + j) * spacing, (newWorldYPos) * spacing, 0.0f);
+                        Vector4 localPosition = new Vector4(xOffset * spacing, yOffset * spacing, 0.0f, 1.0f);
+                        localPosition = rootTransform * localPosition;
+                        colliderRootPos = transform.localToWorldMatrix * localPosition;
+                        colliderRootPos.z = 0;
+
+                        ConfigureNewNodePosition(x, oldStart, colliderRootPos, localPosition);
+
+                        GravNode newStartGN = gravGrid[x, newStartY];
+                        GravNode oldStartNewEndGN = gravGrid[x, oldStart];
+                        GravNode oldEndGN = gravGrid[x, oldEnd];
+
+                        ConfigureNewStartAndEndNodes(
+                            oldStartNewEndGN, //break
+                            newStartGN, //break
+                            oldEndGN,   // connect
+                            oldStartNewEndGN, //connect
+                            newStartGN, //start
+                            oldStartNewEndGN, //end
+                            oldEndGN, //middle
+                            x, mStartWorldX, mHorizontalParticles, Link.Dir.Up);
+                    }
+                    mStartWorldY = newStart;
+                    if (sectorShift)
+                        ArrangeAroundNormal(rootTransform);
                     break;
                 }
             case GridShiftDirection.Left:
@@ -395,13 +507,30 @@ internal void SetLineWidthScalar(float newScale)
                     int newStart = mStartWorldX - 1;
                     int oldStart = mod(mStartWorldX, mHorizontalParticles);
                     int oldEnd = mod(mStartWorldX + mHorizontalParticles - 1, mHorizontalParticles);
-                    int newEnd = mod(newStart + mHorizontalParticles - 1, mHorizontalParticles);
+                    int newEnd = mod(mStartWorldX + mHorizontalParticles - 2, mHorizontalParticles);
+
+                    bool sectorShift = false;
+                    if (oldEnd == 0) // sector is moving!!
+                    {
+                        sectorStartX -= mHorizontalParticles;
+                        rootTransform = GetClosestParentNode();
+                        sectorShift = true;
+                    }
+
                     for (int j = 0; j < mVerticalParticles; j++)
                     {
                         int y = mod((mStartWorldY + j), mVerticalParticles);
 
-                        Vector3 rootPos = new Vector3((mStartWorldX - 1) * spacing, (mStartWorldY + j) * spacing, 0.0f);
-                        ConfigureNewNodePosition(oldEnd, y, rootPos, rootPos);
+                        int yOffset = (j + mStartWorldY) - sectorStartY;
+                        int xOffset = newStart - sectorStartX;
+
+                        Vector3 colliderRootPos = new Vector3((newStart) * spacing, (mStartWorldY + j) * spacing, 0.0f);
+                        Vector4 localPosition = new Vector4(xOffset * spacing, yOffset * spacing, 0.0f, 1.0f);
+                        localPosition = rootTransform * localPosition;
+                        colliderRootPos = transform.localToWorldMatrix * localPosition;
+                        colliderRootPos.z = 0;
+
+                        ConfigureNewNodePosition(oldEnd, y, colliderRootPos, localPosition);
 
                         GravNode oldStartGN = gravGrid[oldStart, y];
                         GravNode newEndGN = gravGrid[newEnd, y];
@@ -416,43 +545,11 @@ internal void SetLineWidthScalar(float newScale)
                             oldEndNewStartGN, //start
                             newEndGN, //end
                             oldStartGN, //middle
-                            y, mStartWorldY, mVerticalParticles);
+                            y, mStartWorldY, mVerticalParticles, Link.Dir.Right);
                     }
-                    mStartWorldX -= 1;
-                    sectorStartX = mod(sectorStartX + 1, mHorizontalParticles);
-
-                    break;
-                }
-            case GridShiftDirection.Up:
-                {
-                    int newStart = mStartWorldY + 1;
-                    int oldEnd = mod(mStartWorldY + mVerticalParticles - 1, mVerticalParticles);
-                    int newStartY = mod(newStart, mVerticalParticles);
-                    int oldStart = mod(mStartWorldY, mVerticalParticles);
-
-                    for (int j = 0; j < mHorizontalParticles; j++)
-                    {
-                        int x = mod((mStartWorldX + j), mHorizontalParticles);
-                        Vector3 rootPos = new Vector3( (mStartWorldX + j) * spacing, (mStartWorldY + mVerticalParticles) * spacing, 0.0f);
-                        ConfigureNewNodePosition(x, oldStart, rootPos, rootPos);
-
-                        GravNode newStartGN = gravGrid[x, newStartY];
-                        GravNode oldStartNewEndGN = gravGrid[x, oldStart];
-                        GravNode oldEndGN = gravGrid[x, oldEnd];
-
-                        ConfigureNewStartAndEndNodes(
-                            oldStartNewEndGN, //break
-                            newStartGN, //break
-                            oldEndGN,   // connect
-                            oldStartNewEndGN, //connect
-                            newStartGN, //start
-                            oldStartNewEndGN, //end
-                            oldEndGN, //middle
-                            x, mStartWorldX, mHorizontalParticles);
-                    }
-                    mStartWorldY = newStart;
-                    sectorStartY = mod(sectorStartY - 1, mVerticalParticles);
-
+                    mStartWorldX = newStart;
+                    if (sectorShift)
+                        ArrangeAroundNormal(rootTransform);
                     break;
                 }
             case GridShiftDirection.Down:
@@ -460,17 +557,34 @@ internal void SetLineWidthScalar(float newScale)
                     int newStart = mStartWorldY - 1;
                     int oldStart = mod(mStartWorldY, mVerticalParticles);
                     int oldEnd = mod(mStartWorldY + mVerticalParticles - 1, mVerticalParticles);
-                    int newEnd = mod(newStart + mVerticalParticles - 1, mVerticalParticles);
+                    int newEnd = mod(mStartWorldY + mHorizontalParticles - 2, mHorizontalParticles);
+
+                    bool sectorShift = false;
+                    if (oldEnd == 0) // sector is moving!!
+                    {
+                        sectorStartY -= mVerticalParticles;
+                        rootTransform = GetClosestParentNode();
+                        sectorShift = true;
+                    }
+
                     for (int j = 0; j < mHorizontalParticles; j++)
                     {
                         int x = mod((mStartWorldX + j), mHorizontalParticles);
-                        Vector3 rootPos = new Vector3((mStartWorldX + j) * spacing, (mStartWorldY - 1) * spacing,  0.0f);
-                        ConfigureNewNodePosition(x, oldEnd, rootPos, rootPos);
+
+                        int yOffset = newStart - sectorStartY;
+                        int xOffset = (j + mStartWorldX) - sectorStartX;
+
+                        Vector3 colliderRootPos = new Vector3((mStartWorldX + j) * spacing, (newStart) * spacing, 0.0f);
+                        Vector4 localPosition = new Vector4(xOffset * spacing, yOffset * spacing, 0.0f, 1.0f);
+                        localPosition = rootTransform * localPosition;
+                        colliderRootPos = transform.localToWorldMatrix * localPosition;
+                        colliderRootPos.z = 0;
+
+                        ConfigureNewNodePosition(x, oldEnd, colliderRootPos, localPosition);
 
                         GravNode oldStartGN = gravGrid[x, oldStart];
                         GravNode newEndGN = gravGrid[x, newEnd];
                         GravNode oldEndNewStartGN = gravGrid[x, oldEnd];
-
 
                         ConfigureNewStartAndEndNodes(
                             newEndGN, //break
@@ -480,11 +594,11 @@ internal void SetLineWidthScalar(float newScale)
                             oldEndNewStartGN, //start
                             newEndGN, //end
                             oldStartGN, //middle
-                            x, mStartWorldX, mHorizontalParticles);
+                            x, mStartWorldX, mHorizontalParticles, Link.Dir.Up);
                     }
-                    mStartWorldY -= 1;
-                    sectorStartY = mod(sectorStartY + 1, mVerticalParticles);
-
+                    mStartWorldY = newStart;
+                    if (sectorShift)
+                        ArrangeAroundNormal(rootTransform);
                     break;
                 }
             default:
@@ -505,8 +619,6 @@ internal void SetLineWidthScalar(float newScale)
         targetPositions[index] = relativePos;
         returnPositions[index] = relativePos;
         positions[index] = relativePos;
-        affected[index] = false;
-        moveables[index] = false;
         gn.SetMoveable(false);
     }
 
@@ -518,11 +630,11 @@ internal void SetLineWidthScalar(float newScale)
         GravNode newStart,
         GravNode newEnd,
         GravNode newMid,
-        int row, int start, int max)
+        int row, int start, int max, Link.Dir dir)
     {
         s_AddConnections.Begin();
         RemoveConnection(break1, break2);
-        AddAndSetupConnectionAtNextIndex(connect1, connect2, true, m_GravMesh);
+        AddAndSetupConnectionAtNextIndex(connect1, connect2, true, m_GravMesh, dir);
         s_AddConnections.End();
 
         s_SetGravNodeConnectionProperties.Begin();
@@ -548,14 +660,14 @@ internal void SetLineWidthScalar(float newScale)
 
     static ProfilerMarker s_RemoveLinkCreateIP = new ProfilerMarker("RemoveLinkeCreateIP");
 
-    public void AddAndSetupConnectionAtNextIndex(GravNode gn1, GravNode gn2, bool draw, GravMesh gravMesh)
+    public void AddAndSetupConnectionAtNextIndex(GravNode gn1, GravNode gn2, bool draw, GravMesh gravMesh, Link.Dir dir)
     {
         if (availableConnectionIndex.Count == 0)
             Debug.LogError("There are no available connections.");
         s_CreateNewLink.Begin();
         int index = availableConnectionIndex.Dequeue();
         //We're not going to update the thickness data as to preserve the sector location.
-        connections[index].MakeLink(gn1, gn2, draw, gravMesh, 0);
+        connections[index].MakeLink(gn1, gn2, draw, gravMesh, 0, dir, spacing);
         s_CreateNewLink.End();
 
         gn1Index[index] = connections[index].m_GravNode1PosIndex;
@@ -601,8 +713,17 @@ internal void SetLineWidthScalar(float newScale)
 
     public Vector3 GetMeshCenterWorld()
     {
-        Vector3 localMeshMiddle = new Vector3(mStartWorldX * spacing +  (mHorizontalParticles * spacing) / 2.0f, mStartWorldY * spacing + (mVerticalParticles * spacing) / 2.0f, 0.0f);
-        return transform.position + localMeshMiddle;
+        if (!positions.IsCreated)
+            return Vector3.zero;
+        int x = mod(mStartWorldX + mHorizontalParticles / 2, mHorizontalParticles);
+        int y = mod(mStartWorldY + mVerticalParticles / 2, mVerticalParticles);
+
+        float3 p = positions[gravGrid[x, y].m_Index];
+        Vector4 v = new Vector4(p.x,p.y, p.x, 1.0f);
+        v = transform.localToWorldMatrix * v;
+        v.z = 0;
+
+        return v;
     }
 
     int mod(int x, int m)

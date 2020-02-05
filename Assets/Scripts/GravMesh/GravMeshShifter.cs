@@ -12,10 +12,22 @@ public class GravMeshShifter : MonoBehaviour
 
     public float time = 0.25f;
     float timer;
+
+    public bool debug = false;
     void Start()
     {
         spacing = gravGrid.spacing;
     }
+
+    void OnDrawGizmosSelected()
+    {
+        if (!debug)
+            return;
+        Vector3 center = gravGrid.GetMeshCenterWorld();
+        Gizmos.DrawSphere(center, 1);
+    }
+
+
     void Update()
     {
         timer += Time.deltaTime;

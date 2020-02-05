@@ -1,7 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using System.Numerics;
-using UnityEditor.MemoryProfiler;
+﻿using System.Collections.Generic;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Burst;
@@ -9,7 +6,6 @@ using static Unity.Mathematics.math;
 using UnityEngine;
 using Vector3 = UnityEngine.Vector3;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using System;
 
 public class GravNode
@@ -36,10 +32,13 @@ public class GravNode
     public Action<float3, int> SetTargetLocation;
     public Action<int> Return;
     public Action<float3, int> AddForce;
+
+    public Func<int, List<Link.Dir>, List<int>, Matrix4x4> GetNodeTransform;
     public int m_VertexStart;
     public Queue<int> availibleVertexPositions;
 
     public List<Link> m_Links;
+    public List<Link.Dir> m_Directions; //0 left, 1 up, 2 right, 3 down, 4 diag
 
     public GravNode(float3 position, float spacing, int index, Transform anchorParent, int vertexStart, int layer)
     {
@@ -57,12 +56,14 @@ public class GravNode
         gravNodeColliderParent.SetMoveable(true);
         gravNodeColliderParent.affectorCollisionEnter += AffectorCollisionEnter;
         gravNodeColliderParent.affectorCollisionExit += AffectorCollisionExit;
+        gravNodeColliderParent.GetNodeTransformFunc = GetTransformEvent;
         gravNodeColliderParent.transform.parent = anchorParent;
         gravNodeColliderParent.transform.localPosition = position;
         neighborIndiciesList = new List<int>();
 
         stiffnessesList = new List<float>();
         restDistancesList = new List<float>();
+        m_Directions = new List<Link.Dir>();
         m_Connections = 0;
         m_VertexStart = vertexStart;
         availibleVertexPositions = new Queue<int>();
@@ -71,6 +72,11 @@ public class GravNode
         {
             availibleVertexPositions.Enqueue(m_VertexStart + i * 2);
         }
+    }
+
+    private Matrix4x4 GetTransformEvent()
+    {
+        return GetNodeTransform.Invoke(m_Index, m_Directions, neighborIndiciesList);
     }
 
     public int FindLinkIndex(GravNode gn2)

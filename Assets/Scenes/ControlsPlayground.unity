@@ -5081,7 +5081,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &116424838
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5131,6 +5131,7 @@ MonoBehaviour:
   objectToKeepAtCenter: {fileID: 1934508649}
   radius: 1000
   time: 0.5
+  debug: 0
 --- !u!23 &116424841
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -5200,6 +5201,9 @@ MonoBehaviour:
   drawDiagonals: 0
   planeLinkStiffness: 0.3
   lineWidth: 6.6
+  parentLayer:
+    serializedVersion: 2
+    m_Bits: 0
 --- !u!4 &116424844
 Transform:
   m_ObjectHideFlags: 0
@@ -5356,6 +5360,9 @@ MonoBehaviour:
   drawDiagonals: 0
   planeLinkStiffness: 0.3
   lineWidth: 0.1
+  parentLayer:
+    serializedVersion: 2
+    m_Bits: 512
 --- !u!4 &370391343
 Transform:
   m_ObjectHideFlags: 0
@@ -5434,6 +5441,7 @@ MonoBehaviour:
   objectToKeepAtCenter: {fileID: 1934508649}
   radius: 0.2
   time: 0
+  debug: 1
 --- !u!114 &370391347
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10459,7 +10467,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!135 &743557325
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -10529,7 +10537,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 743557324}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -113.9, y: 0, z: 0}
+  m_LocalPosition: {x: -407.3, y: 0, z: 0}
   m_LocalScale: {x: 100, y: 100, z: 100}
   m_Children: []
   m_Father: {fileID: 0}
@@ -15538,8 +15546,8 @@ GameObject:
   m_Component:
   - component: {fileID: 977739320}
   - component: {fileID: 977739321}
-  - component: {fileID: 977739322}
   - component: {fileID: 977739323}
+  - component: {fileID: 977739322}
   m_Layer: 8
   m_Name: GravAffector
   m_TagString: Untagged
@@ -15582,13 +15590,13 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 977739319}
   serializedVersion: 2
-  m_Mass: 0.0000001
+  m_Mass: 1
   m_Drag: 0
-  m_AngularDrag: 0
+  m_AngularDrag: 0.05
   m_UseGravity: 0
   m_IsKinematic: 1
   m_Interpolate: 0
-  m_Constraints: 0
+  m_Constraints: 126
   m_CollisionDetection: 0
 --- !u!114 &977739323
 MonoBehaviour:
@@ -30401,8 +30409,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gravGrid: {fileID: 1740815205}
   objectToKeepAtCenter: {fileID: 1934508649}
-  radius: 5
+  radius: 20
   time: 0.25
+  debug: 0
 --- !u!23 &1740815203
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -30472,6 +30481,9 @@ MonoBehaviour:
   drawDiagonals: 0
   planeLinkStiffness: 0.3
   lineWidth: 0.3
+  parentLayer:
+    serializedVersion: 2
+    m_Bits: 512
 --- !u!4 &1740815206
 Transform:
   m_ObjectHideFlags: 0
@@ -30677,7 +30689,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1934508647}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 100, y: 25, z: 0}
   m_LocalScale: {x: 2, y: 2, z: 2}
   m_Children:
   - {fileID: 977739320}

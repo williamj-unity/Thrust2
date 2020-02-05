@@ -13,6 +13,16 @@ using System;
 
 public class Link
 {
+    public enum Dir
+    {
+        Left,
+        Up,
+        Right,
+        Down,
+        Diag
+    };
+
+
     public float m_RestDistance;
     public int m_GravNode1PosIndex, m_GravNode2PosIndex;
     public int m_VertexStartIndex;
@@ -24,27 +34,28 @@ public class Link
     public int m_Index;
     public float m_Thickness;
 
-    public Link(GravNode gn1, GravNode gn2, bool draw, GravMesh gravMesh, float thickness, int index)
+    public Link(GravNode gn1, GravNode gn2, bool draw, GravMesh gravMesh, float thickness, int index, Dir direction, float spacing)
     {
         m_Index = index;
-        MakeLink(gn1, gn2, draw, gravMesh, thickness);
+        MakeLink(gn1, gn2, draw, gravMesh, thickness, direction, spacing);
     }
 
-    internal void MakeLink(GravNode gn1, GravNode gn2, bool draw, GravMesh gravMesh, float thickness)
+    internal void MakeLink(GravNode gn1, GravNode gn2, bool draw, GravMesh gravMesh, float thickness, Dir direction, float spacing)
     {
         m_Gn1 = gn1;
         m_Gn2 = gn2;
         m_GravNode1PosIndex = gn1.m_Index;
         m_GravNode2PosIndex = gn2.m_Index;
-        m_RestDistance = Vector3.Distance(gn1.GetRootPos(),
-            gn2.GetRootPos());
+        m_RestDistance = spacing;
 
         gn1.m_Links.Add(this);
 
         gn1.neighborIndiciesList.Add(gn2.m_Index);
-        gn2.neighborIndiciesList.Add(gn1.m_Index);
-
+        gn1.m_Directions.Add(direction);
         gn1.restDistancesList.Add(m_RestDistance);
+
+        gn2.neighborIndiciesList.Add(gn1.m_Index);
+        gn2.m_Directions.Add(GetOppositeDir(direction));
         gn2.restDistancesList.Add(m_RestDistance);
 
         m_Draw = draw;
@@ -72,11 +83,15 @@ public class Link
     {
         m_Gn1.m_Links.Remove(this);
 
-        m_Gn1.neighborIndiciesList.Remove(m_Gn2.m_Index);
-        m_Gn2.neighborIndiciesList.Remove(m_Gn1.m_Index);
+        int gn1LinkIndex = m_Gn1.neighborIndiciesList.IndexOf(m_Gn2.m_Index);
+        m_Gn1.neighborIndiciesList.RemoveAt(gn1LinkIndex);
+        m_Gn1.m_Directions.RemoveAt(gn1LinkIndex);
+        m_Gn1.restDistancesList.RemoveAt(gn1LinkIndex);
 
-        m_Gn1.restDistancesList.Remove(m_RestDistance);
-        m_Gn2.restDistancesList.Remove(m_RestDistance);
+        int gn2LinkIndex = m_Gn2.neighborIndiciesList.IndexOf(m_Gn1.m_Index);
+        m_Gn2.neighborIndiciesList.RemoveAt(gn2LinkIndex);
+        m_Gn2.m_Directions.RemoveAt(gn2LinkIndex);
+        m_Gn2.restDistancesList.RemoveAt(gn2LinkIndex);
 
         gravMesh.RemovePair(m_TrianglesIndex);
         m_Gn1.availibleVertexPositions.Enqueue(m_GravNode1VertexStart);
@@ -84,6 +99,24 @@ public class Link
 
         m_Gn1.m_Connections--;
         m_Gn2.m_Connections--;
+    }
+
+    Dir GetOppositeDir(Dir dir)
+    {
+        switch (dir)
+        {
+            case Dir.Left:
+                return Dir.Right;
+            case Dir.Right:
+                return Dir.Left;
+            case Dir.Up:
+                return Dir.Down;
+            case Dir.Down:
+                return Dir.Up;
+            default:
+                return Dir.Diag;
+        }
+
     }
 
     [BurstCompile]

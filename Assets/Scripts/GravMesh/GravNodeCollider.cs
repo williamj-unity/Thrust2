@@ -10,7 +10,7 @@ public class GravNodeCollider : MonoBehaviour
 
     public Action affectorCollisionExit;
 
-    public Func<Matrix4x4> GetNodeTransformFunc;
+    public Func<float3> GetNodeTransformFunc;
     // Start is called before the first frame update
 
     private float maxAffectorMass = Single.NegativeInfinity;
@@ -39,7 +39,7 @@ public class GravNodeCollider : MonoBehaviour
         }
     }
 
-    public Matrix4x4 GetNodeTransform()
+    public float3 GetNodeTransform()
     {
         return GetNodeTransformFunc.Invoke();
     }

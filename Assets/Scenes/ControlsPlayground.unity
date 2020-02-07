@@ -10340,10 +10340,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cb6e5bbb51f287b42ad34aa472019522, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  accelerationCoef: 25
+  accelerationCoef: 20.8
   momentumDamping: 0.875
   m_ControllerType: 0
-  m_ScrollSpeed: 20
+  m_ScrollSpeed: 11.8
 --- !u!20 &519420031
 Camera:
   m_ObjectHideFlags: 0
@@ -30483,7 +30483,7 @@ MonoBehaviour:
   lineWidth: 0.3
   parentLayer:
     serializedVersion: 2
-    m_Bits: 512
+    m_Bits: 0
 --- !u!4 &1740815206
 Transform:
   m_ObjectHideFlags: 0

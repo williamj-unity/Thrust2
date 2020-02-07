@@ -5,6 +5,4 @@ using UnityEngine;
 public class GravNodeAffector : MonoBehaviour
 {
     public float mass;
-
-
 }

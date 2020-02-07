@@ -4,6 +4,7 @@ using Unity.Mathematics;
 using Unity.Burst;
 using static Unity.Mathematics.math;
 using UnityEngine;
+using UnityEngine.Jobs;
 using Vector3 = UnityEngine.Vector3;
 using Unity.Collections;
 using System;
@@ -16,7 +17,7 @@ public class GravNode
     public float3 m_Position;
     public float3 m_PrevPosition;
     public float3 m_TargetPosition;
-    public float3 m_StartPosition;
+    public float3 m_ReturnPosition;
     public float3 m_Acceleration;
     public GravNodeCollider gravNodeColliderParent { get; private set; }
 
@@ -33,7 +34,7 @@ public class GravNode
     public Action<int> Return;
     public Action<float3, int> AddForce;
 
-    public Func<int, List<Link.Dir>, List<int>, Matrix4x4> GetNodeTransform;
+    public Func<int, float3> GetNodePosition;
     public int m_VertexStart;
     public Queue<int> availibleVertexPositions;
 
@@ -46,7 +47,7 @@ public class GravNode
         m_Position = position;
         m_PrevPosition = position;
         m_TargetPosition = m_Position;
-        m_StartPosition = m_Position;
+        m_ReturnPosition = m_Position;
         m_Acceleration = float3(0,0,0);
         m_Index = index;
         m_Moveable = true;
@@ -56,7 +57,7 @@ public class GravNode
         gravNodeColliderParent.SetMoveable(true);
         gravNodeColliderParent.affectorCollisionEnter += AffectorCollisionEnter;
         gravNodeColliderParent.affectorCollisionExit += AffectorCollisionExit;
-        gravNodeColliderParent.GetNodeTransformFunc = GetTransformEvent;
+        gravNodeColliderParent.GetNodeTransformFunc = GetNodePositionCallback;
         gravNodeColliderParent.transform.parent = anchorParent;
         gravNodeColliderParent.transform.localPosition = position;
         neighborIndiciesList = new List<int>();
@@ -74,9 +75,9 @@ public class GravNode
         }
     }
 
-    private Matrix4x4 GetTransformEvent()
+    private float3 GetNodePositionCallback()
     {
-        return GetNodeTransform.Invoke(m_Index, m_Directions, neighborIndiciesList);
+        return GetNodePosition.Invoke(m_Index);
     }
 
     public int FindLinkIndex(GravNode gn2)
@@ -98,7 +99,7 @@ public class GravNode
 
     public Vector3 GetRootPos()
     {
-        return gravNodeColliderParent.transform.localPosition;
+        return m_ReturnPosition;
     }
 
     public void SetHomePosition(Vector3 position)
@@ -106,7 +107,7 @@ public class GravNode
         m_Position = position;
         m_PrevPosition = position;
         m_TargetPosition = m_Position;
-        m_StartPosition = m_Position;
+        m_ReturnPosition = m_Position;
         m_Acceleration = float3(0, 0, 0);
     }
 
@@ -114,7 +115,7 @@ public class GravNode
     {
         if (!m_Moveable)
             return;
-        Vector3 newPose = m_StartPosition;
+        Vector3 newPose = m_ReturnPosition;
         newPose.z = mass;
         SetTargetPosition(newPose);
     }
@@ -140,6 +141,150 @@ public class GravNode
         if (m_Moveable)
             AddForce(force, m_Index);
     }
+
+    public struct MoveColliders : IJobParallelForTransform
+    {
+        public void Execute(int index, TransformAccess transform)
+        {
+
+        }
+    }
+
+    [BurstCompile]
+    public struct SetOffsets : IJobParallelFor
+    {
+        [ReadOnly]
+        public int2 worldStart;
+        [ReadOnly]
+        public int2 sectorStart;
+        [ReadOnly]
+        public int2 dimensions;
+        [ReadOnly]
+        public NativeArray<int2> coordinate;
+        [WriteOnly]
+        public NativeArray<float2> sectorOffsets;
+
+        public void Execute(int index)
+        {
+            int xOffset = (coordinate[index].x + worldStart.x) - sectorStart.x;
+            float t = ((float)xOffset / (float)dimensions.x + 1.0f) / 2.0f;
+            int yOffset = (coordinate[index].y + worldStart.y) - sectorStart.y;
+            float s = ((float)yOffset / (float)dimensions.y + 1.0f) / 2.0f;
+            sectorOffsets[index] = new float2(t,s);
+        }
+    }
+
+    [BurstCompile]
+    public struct ShiftPlane2ElectricBoogaloo : IJobParallelFor
+    {
+        [ReadOnly]
+        public NativeArray<float3> nodePoses;
+        [ReadOnly]
+        public NativeArray<float2> sectorOffsets;
+        [ReadOnly]
+        public NativeArray<float2> parentNodeOffsets;
+        [ReadOnly]
+        public int numTriangles;
+        [ReadOnly]
+        public NativeArray<int> triangles;
+        [ReadOnly]
+        public NativeArray<bool> affected;
+        [WriteOnly]
+        public NativeArray<float3> targetPositions;
+        [WriteOnly]
+        public NativeArray<float3> returnPositions;
+
+        public void Execute(int index)
+        {
+            float3 coords = 0;
+            int goldenTri = 0;
+            for(int i = 0; i < numTriangles; i++)
+            {
+                float2 a = parentNodeOffsets[triangles[i * 3]];
+                float2 b = parentNodeOffsets[triangles[i * 3 + 1]];
+                float2 c = parentNodeOffsets[triangles[i * 3 + 2]];
+
+                coords = Barycentric(sectorOffsets[index], a, b, c);
+                if(!(coords.x < 0 || coords.y < 0 || coords.z < 0))
+                {
+                    goldenTri = i;
+                    break;
+                }
+            }
+
+            float3 aPose = nodePoses[goldenTri];
+            float3 bPose = nodePoses[goldenTri];
+            float3 cPose = nodePoses[goldenTri];
+
+            float3 pose = aPose * coords.x + bPose * coords.y + cPose * coords.z;
+            returnPositions[index] = pose;
+            if (!affected[index])
+                targetPositions[index] = pose;
+        }
+
+        public static float3 Barycentric(float2 p, float2 a, float2 b, float2 c)
+        {
+            float3 n;
+            float2 v0 = b - a;
+            float2 v1 = c - a;
+            float2 v2 = p - a;
+            //can be cached
+            float d00 = math.dot(v0, v0);
+            float d01 = math.dot(v0, v1);
+            float d11 = math.dot(v1, v1);
+
+            //cannot be cached
+            float d20 = math.dot(v2, v0);
+            float d21 = math.dot(v2, v1);
+
+            //can be cached
+            float denom = d00 * d11 - d01 * d01;
+            n.x = (d11 * d20 - d01 * d21) / denom;
+            n.y = (d00 * d21 - d01 * d20) / denom;
+            n.z = 1.0f - n.x - n.y;
+            return n;
+        }
+    }
+
+
+    [BurstCompile]
+    public struct ShiftPlane : IJobParallelFor
+    {
+        [ReadOnly]
+        public float3 A;
+        [ReadOnly]
+        public float3 B;
+        [ReadOnly]
+        public float3 C;
+        [ReadOnly]
+        public float3 D;
+        [ReadOnly]
+        public float3 E;
+        [ReadOnly]
+        public NativeArray<float2> sectorOffsets;
+        [ReadOnly]
+        public NativeArray<bool> affected;
+        [WriteOnly]
+        public NativeArray<float3> targetPositions;
+        [WriteOnly]
+        public NativeArray<float3> returnPositions; 
+
+        public void Execute(int index)
+        {
+            float t = sectorOffsets[index].x;
+            float3 AB_interp = (1 - t) * C + t * D;
+            float3 CD_interp = (1 - t) * A + t * B;
+
+            float s = sectorOffsets[index].y;
+            float3 final = (1 - s) * AB_interp + s * CD_interp;
+            float3 pose = final;
+
+            returnPositions[index] = pose;
+            if (!affected[index])
+                targetPositions[index] = pose;
+        }
+    }
+
 
     [BurstCompile]
     public struct UpdateJob : IJobParallelFor

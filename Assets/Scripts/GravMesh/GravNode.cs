@@ -30,16 +30,18 @@ public class GravNode
     public List<float> restDistancesList;
     public List<float> stiffnessesList;
 
+
     public Action<float3, int> SetTargetLocation;
     public Action<int> Return;
     public Action<float3, int> AddForce;
 
     public Func<int, float3> GetNodePosition;
+    public Func<int, float3> GetReturnPosition;
+
     public int m_VertexStart;
     public Queue<int> availibleVertexPositions;
 
     public List<Link> m_Links;
-    public List<Link.Dir> m_Directions; //0 left, 1 up, 2 right, 3 down, 4 diag
 
     public GravNode(float3 position, float spacing, int index, Transform anchorParent, int vertexStart, int layer)
     {
@@ -53,7 +55,7 @@ public class GravNode
         m_Moveable = true;
         gravNodeColliderParent = new GameObject("GravNodeAnchor").AddComponent<GravNodeCollider>();
         gravNodeColliderParent.gameObject.layer = layer;
-        gravNodeColliderParent.SetSpacing(spacing/2);
+        gravNodeColliderParent.SetSpacing(spacing);
         gravNodeColliderParent.SetMoveable(true);
         gravNodeColliderParent.affectorCollisionEnter += AffectorCollisionEnter;
         gravNodeColliderParent.affectorCollisionExit += AffectorCollisionExit;
@@ -64,7 +66,6 @@ public class GravNode
 
         stiffnessesList = new List<float>();
         restDistancesList = new List<float>();
-        m_Directions = new List<Link.Dir>();
         m_Connections = 0;
         m_VertexStart = vertexStart;
         availibleVertexPositions = new Queue<int>();
@@ -102,20 +103,12 @@ public class GravNode
         return m_ReturnPosition;
     }
 
-    public void SetHomePosition(Vector3 position)
-    {
-        m_Position = position;
-        m_PrevPosition = position;
-        m_TargetPosition = m_Position;
-        m_ReturnPosition = m_Position;
-        m_Acceleration = float3(0, 0, 0);
-    }
 
     void AffectorCollisionEnter(float mass)
     {
         if (!m_Moveable)
             return;
-        Vector3 newPose = m_ReturnPosition;
+        Vector3 newPose = GetReturnPosition(m_Index);
         newPose.z = mass;
         SetTargetPosition(newPose);
     }
@@ -144,9 +137,19 @@ public class GravNode
 
     public struct MoveColliders : IJobParallelForTransform
     {
+        [ReadOnly]
+        public NativeArray<float3> positions;
+
+        public NativeArray<bool> forceUpdatePosition;
         public void Execute(int index, TransformAccess transform)
         {
-
+            bool cont = forceUpdatePosition[index];
+            forceUpdatePosition[index] = false;
+            if (!cont)
+                return;
+            float3 pos = positions[index];
+            pos.z = 0;
+            transform.position = pos;
         }
     }
 
@@ -173,79 +176,6 @@ public class GravNode
             sectorOffsets[index] = new float2(t,s);
         }
     }
-
-    [BurstCompile]
-    public struct ShiftPlane2ElectricBoogaloo : IJobParallelFor
-    {
-        [ReadOnly]
-        public NativeArray<float3> nodePoses;
-        [ReadOnly]
-        public NativeArray<float2> sectorOffsets;
-        [ReadOnly]
-        public NativeArray<float2> parentNodeOffsets;
-        [ReadOnly]
-        public int numTriangles;
-        [ReadOnly]
-        public NativeArray<int> triangles;
-        [ReadOnly]
-        public NativeArray<bool> affected;
-        [WriteOnly]
-        public NativeArray<float3> targetPositions;
-        [WriteOnly]
-        public NativeArray<float3> returnPositions;
-
-        public void Execute(int index)
-        {
-            float3 coords = 0;
-            int goldenTri = 0;
-            for(int i = 0; i < numTriangles; i++)
-            {
-                float2 a = parentNodeOffsets[triangles[i * 3]];
-                float2 b = parentNodeOffsets[triangles[i * 3 + 1]];
-                float2 c = parentNodeOffsets[triangles[i * 3 + 2]];
-
-                coords = Barycentric(sectorOffsets[index], a, b, c);
-                if(!(coords.x < 0 || coords.y < 0 || coords.z < 0))
-                {
-                    goldenTri = i;
-                    break;
-                }
-            }
-
-            float3 aPose = nodePoses[goldenTri];
-            float3 bPose = nodePoses[goldenTri];
-            float3 cPose = nodePoses[goldenTri];
-
-            float3 pose = aPose * coords.x + bPose * coords.y + cPose * coords.z;
-            returnPositions[index] = pose;
-            if (!affected[index])
-                targetPositions[index] = pose;
-        }
-
-        public static float3 Barycentric(float2 p, float2 a, float2 b, float2 c)
-        {
-            float3 n;
-            float2 v0 = b - a;
-            float2 v1 = c - a;
-            float2 v2 = p - a;
-            //can be cached
-            float d00 = math.dot(v0, v0);
-            float d01 = math.dot(v0, v1);
-            float d11 = math.dot(v1, v1);
-
-            //cannot be cached
-            float d20 = math.dot(v2, v0);
-            float d21 = math.dot(v2, v1);
-
-            //can be cached
-            float denom = d00 * d11 - d01 * d01;
-            n.x = (d11 * d20 - d01 * d21) / denom;
-            n.y = (d00 * d21 - d01 * d20) / denom;
-            n.z = 1.0f - n.x - n.y;
-            return n;
-        }
-    }
-
 
     [BurstCompile]
     public struct ShiftPlane : IJobParallelFor

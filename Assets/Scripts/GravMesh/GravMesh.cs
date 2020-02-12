@@ -21,17 +21,20 @@ public class GravMesh
     public NativeArray<float3> vertices;
     public int[] triangles;
 
-    bool requiresFullRebuild = false;
-
     Material material;
+    Bounds b;
 
-    public GravMesh(float radius, MeshFilter meshFilter)
+    public GravMesh(Vector3 size, float shaderRadius, MeshFilter meshFilter)
     {
         mesh = new Mesh();
+        b = mesh.bounds;
+        b.size = size;
+        mesh.bounds = b;
+
         filter = meshFilter;
         filter.mesh = mesh;
         material = meshFilter.GetComponent<MeshRenderer>().material;
-        material.SetFloat("Vector1_948E4DE1", radius);
+        material.SetFloat("Vector1_948E4DE1", shaderRadius);
         index = 0;
         newVertices = new List<float3>();
         newTriangles = new List<int>();
@@ -39,6 +42,7 @@ public class GravMesh
         newUV = new List<Vector2>();
         mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         availableTriIndex = new Queue<int>();
+
     }
 
     //each node will have 8 verticies it can use to form a line segment with up to 4 other nodes
@@ -98,7 +102,6 @@ public class GravMesh
         }
         else
         {
-            requiresFullRebuild = true;
             ret = newTriangles.Count;
             newTriangles.Add(gn1);
             newTriangles.Add(gn1 + 1);
@@ -121,8 +124,9 @@ public class GravMesh
         material.SetVector("Vector2_7F65F0F6", new Vector4(center.x, center.y));
         mesh.SetVertices(vertices);
         mesh.SetUVs(0, newUV);
-        mesh.SetTriangles(triangles, 0, true);
-        mesh.RecalculateBounds();
+        mesh.SetTriangles(triangles, 0, false);
+        b.center = center;
+        mesh.bounds = b;
     }
 
     public void ConstructMesh()
@@ -138,7 +142,6 @@ public class GravMesh
         mesh.uv = newUVArray;
         mesh.SetTriangles(triangles, 0);
         mesh.normals = normalsArray;
-
         newTriangles.Clear();
     }
 

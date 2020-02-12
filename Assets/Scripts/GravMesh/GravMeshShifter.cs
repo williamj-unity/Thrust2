@@ -27,7 +27,6 @@ public class GravMeshShifter : MonoBehaviour
         Gizmos.DrawSphere(center, 1);
     }
 
-
     void Update()
     {
         timer += Time.deltaTime;

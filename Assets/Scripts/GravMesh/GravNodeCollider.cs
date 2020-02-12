@@ -20,8 +20,8 @@ public class GravNodeCollider : MonoBehaviour
     SortedSet<GravNodeAffector> collidedGravNodeAffectors = new SortedSet<GravNodeAffector>(new GravAffectorComparer());
     void Start()
     {
-        var collider = gameObject.AddComponent<SphereCollider>();
-        collider.radius = m_Spacing;
+        var collider = gameObject.AddComponent<BoxCollider>();
+        collider.size = new Vector3(m_Spacing, m_Spacing, 0.5f);
     }
 
     public void SetSpacing(float spacing)

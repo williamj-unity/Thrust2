@@ -5460,7 +5460,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cameraZoomer: {fileID: 519420030}
   min: -5
-  max: 30
+  max: 4
 --- !u!114 &370391348
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -30667,7 +30667,7 @@ MonoBehaviour:
   gravGridDimensions: 50
   startingRootCoordinate: {x: 0, y: 0}
   spacing: 62.5
-  planeLinkStiffness: 0.3
+  planeLinkStiffness: 1
   lineWidth: 1
   parentLayer:
     serializedVersion: 2
